@@ -16,14 +16,17 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NaverNewsProducer {
 
-    private final KafkaTemplate<String, Object> kafkaTemplate; // Kafka 전송 도구
-    private final RestTemplate restTemplate = new RestTemplate(); // API 호출 도구
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${naver.api.client-id}")
     private String clientId;
@@ -34,24 +37,24 @@ public class NaverNewsProducer {
     @Value("${naver.api.url}")
     private String apiUrl;
 
-    // 10초마다 실행 (테스트용) -> 실제론 10분(600000) 정도로 늘리세요
-    @Scheduled(fixedDelay = 10000)
+    // 🔥 [중복 방지용 캐시] 이미 보낸 링크는 기억해둡니다.
+    private final Set<String> sentLinkCache = Collections.synchronizedSet(new HashSet<>());
+
+    // 10초마다 실행 (테스트 끝나면 시간을 늘리세요)
+    @Scheduled(fixedDelay = 300000)
     public void crawlNaverNews() {
         log.info(">>>> [NaverNewsProducer] 뉴스 수집 시작...");
 
-        // 1. 검색어 설정 (IT 트렌드 키워드)
-        String keyword = "Kafka";
+        String keyword = "IT 기술";
 
-        // 2. 요청 URI 만들기 (검색어, 정렬순, 개수)
         URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
                 .queryParam("query", keyword)
-                .queryParam("display", 10)  // 10개씩 가져오기
+                .queryParam("display", 10)
                 .queryParam("sort", "date") // 최신순
                 .encode(StandardCharsets.UTF_8)
                 .build()
                 .toUri();
 
-        // 3. 헤더에 키 담아서 요청 보내기
         RequestEntity<Void> req = RequestEntity
                 .get(uri)
                 .header("X-Naver-Client-Id", clientId)
@@ -61,24 +64,39 @@ public class NaverNewsProducer {
         try {
             ResponseEntity<NaverApiDto.Response> response = restTemplate.exchange(req, NaverApiDto.Response.class);
 
-            // 4. 받아온 뉴스 목록을 Kafka로 쏘기
             if (response.getBody() != null && response.getBody().getItems() != null) {
+                int count = 0;
                 for (NaverApiDto.Item item : response.getBody().getItems()) {
 
-                    // 메시지 박스에 담기
+                    String link = item.getOriginallink().isEmpty() ? item.getLink() : item.getOriginallink();
+
+                    // 🔥 [중복 체크] 이미 보낸 링크면 건너뜀
+                    if (sentLinkCache.contains(link)) {
+                        continue;
+                    }
+
                     NewsMessage message = NewsMessage.builder()
-                            .title(item.getTitle().replaceAll("<[^>]*>", "")) // HTML 태그 제거 (<b> 등)
-                            .link(item.getOriginallink().isEmpty() ? item.getLink() : item.getOriginallink())
+                            .title(item.getTitle().replaceAll("<[^>]*>", ""))
+                            .link(link)
                             .description(item.getDescription().replaceAll("<[^>]*>", ""))
-                            .source("Naver API")
-                            .type(NewsType.NEWS) // "뉴스" 타입 지정
-                            .pubDateStr(item.getPubDate())
+                            .source("Naver API")        // 필드: source
+                            .type(NewsType.NEWS)        // 필드: type (Enum)
+                            .pubDateStr(item.getPubDate()) // 필드: pubDateStr (주의: String 타입)
                             .build();
 
-                    // 🔥 Kafka로 발사! (토픽명: dev-news)
+                    // Kafka 전송
                     kafkaTemplate.send("dev-news", message);
+
+                    // 캐시 저장
+                    sentLinkCache.add(link);
+                    count++;
                 }
-                log.info(">>>> [NaverNewsProducer] {}건의 뉴스 Kafka 전송 완료", response.getBody().getItems().size());
+
+                if (count > 0) {
+                    log.info(">>>> [NaverNewsProducer] {}건의 새로운 뉴스 전송 완료", count);
+                } else {
+                    log.info(">>>> [NaverNewsProducer] 새로운 뉴스가 없습니다 (중복 제외됨).");
+                }
             }
 
         } catch (Exception e) {

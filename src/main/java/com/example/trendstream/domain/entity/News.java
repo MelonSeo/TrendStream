@@ -54,12 +54,14 @@ public class News {
     private List<NewsTag> newsTags = new ArrayList<>();
 
     @Builder
-    public News(String title, String link, String description, String source, LocalDateTime pubDate) {
+    public News(String title, String link, String description, String source, NewsType type, LocalDateTime pubDate, AiResponse aiResult) {
         this.title = title;
         this.link = link;
         this.description = description;
         this.source = source;
+        this.type = type;
         this.pubDate = pubDate;
+        this.aiResult = aiResult; // 추가됨
     }
 
     // AI 분석 결과 업데이트 편의 메서드
