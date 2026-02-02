@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Slf4j
@@ -26,7 +28,6 @@ import java.util.Set;
 public class NaverNewsProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
-    private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${naver.api.client-id}")
     private String clientId;
@@ -37,15 +38,29 @@ public class NaverNewsProducer {
     @Value("${naver.api.url}")
     private String apiUrl;
 
+    @Value("${naver.api.keywords}")
+    private List<String> keywords;
+
     // 🔥 [중복 방지용 캐시] 이미 보낸 링크는 기억해둡니다.
     private final Set<String> sentLinkCache = Collections.synchronizedSet(new HashSet<>());
 
-    // 10초마다 실행 (테스트 끝나면 시간을 늘리세요)
+    // 5분마다 실행
     @Scheduled(fixedDelay = 300000)
     public void crawlNaverNews() {
-        log.info(">>>> [NaverNewsProducer] 뉴스 수집 시작...");
+        log.info(">>>> [NaverNewsProducer] 전체 키워드에 대한 뉴스 수집을 시작합니다...");
+        for (String keyword : keywords) {
+            crawlAndSendNewsForKeyword(keyword);
+        }
+        log.info(">>>> [NaverNewsProducer] 전체 뉴스 수집을 완료했습니다.");
+    }
 
-        String keyword = "IT 기술";
+    private void crawlAndSendNewsForKeyword(String keyword) {
+        // RestTemplate을 이 메소드 내에서 생성하고 UTF-8 설정을 추가합니다.
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.getMessageConverters()
+                .add(0, new StringHttpMessageConverter(StandardCharsets.UTF_8));
+
+        log.info(">>>> [NaverNewsProducer] '{}' 키워드 뉴스 수집 시작...", keyword);
 
         URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
                 .queryParam("query", keyword)
@@ -70,7 +85,6 @@ public class NaverNewsProducer {
 
                     String link = item.getOriginallink().isEmpty() ? item.getLink() : item.getOriginallink();
 
-                    // 🔥 [중복 체크] 이미 보낸 링크면 건너뜀
                     if (sentLinkCache.contains(link)) {
                         continue;
                     }
@@ -79,28 +93,24 @@ public class NaverNewsProducer {
                             .title(item.getTitle().replaceAll("<[^>]*>", ""))
                             .link(link)
                             .description(item.getDescription().replaceAll("<[^>]*>", ""))
-                            .source("Naver API")        // 필드: source
-                            .type(NewsType.NEWS)        // 필드: type (Enum)
-                            .pubDateStr(item.getPubDate()) // 필드: pubDateStr (주의: String 타입)
+                            .source("Naver API")
+                            .type(NewsType.NEWS)
+                            .pubDateStr(item.getPubDate())
                             .build();
 
-                    // Kafka 전송
                     kafkaTemplate.send("dev-news", message);
-
-                    // 캐시 저장
                     sentLinkCache.add(link);
                     count++;
                 }
 
                 if (count > 0) {
-                    log.info(">>>> [NaverNewsProducer] {}건의 새로운 뉴스 전송 완료", count);
+                    log.info(">>>> [NaverNewsProducer] '{}' 키워드로 {}건의 새로운 뉴스 전송 완료", keyword, count);
                 } else {
-                    log.info(">>>> [NaverNewsProducer] 새로운 뉴스가 없습니다 (중복 제외됨).");
+                    log.info(">>>> [NaverNewsProducer] '{}' 키워드의 새로운 뉴스가 없습니다.", keyword);
                 }
             }
-
         } catch (Exception e) {
-            log.error(">>>> [에러] 네이버 뉴스 수집 실패: {}", e.getMessage());
+            log.error(">>>> [에러] '{}' 키워드 뉴스 수집 실패: {}", keyword, e.getMessage());
         }
     }
 }
