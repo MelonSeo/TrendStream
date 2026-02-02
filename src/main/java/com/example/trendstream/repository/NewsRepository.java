@@ -132,6 +132,18 @@ public interface NewsRepository extends JpaRepository<News, Long> {
     Page<News> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
     /**
+     * AI 분석이 안 된 뉴스 조회 (배치 처리용)
+     *
+     * [사용처]
+     * - NewsAnalysisScheduler에서 배치 분석할 뉴스 조회
+     * - aiResult가 NULL인 뉴스만 가져옴
+     *
+     * @param pageable 페이지 정보 (size로 배치 크기 제어)
+     * @return AI 분석이 필요한 뉴스 목록
+     */
+    Page<News> findByAiResultIsNull(Pageable pageable);
+
+    /**
      * AI 중요도 점수순 정렬 (Native Query)
      *
      * [Native Query 사용 이유]
