@@ -33,9 +33,9 @@
 - Native Query는 예외: 쿼리 내에서 직접 ORDER BY 지정 필요
 
 ### 2.5 AI 분석 배치 처리 (Important)
-- **배치 크기**: 5개씩 묶어서 1회 API 호출
+- **배치 크기**: 3개씩 묶어서 1회 API 호출
 - **스케줄러**: `NewsAnalysisScheduler`가 30초마다 실행
-- **API 절약**: 기존 대비 80% API 호출 감소
+- **Rate Limit 관리**: 스케줄러가 단독으로 담당 (KafkaConfig에서는 제어하지 않음)
 - **처리 흐름**: Consumer → DB 저장 (aiResult=null) → 스케줄러 → 배치 분석 → 업데이트
 
 ### 2.6 Architecture Flow

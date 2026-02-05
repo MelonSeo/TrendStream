@@ -18,16 +18,16 @@ import java.util.List;
  *
  * [도입 배경]
  * - 기존: 뉴스 1개당 API 1회 호출 → 무료 한도 빠르게 소진
- * - 개선: 5개씩 묶어서 1회 호출 → API 호출 80% 절약
+ * - 개선: 3개씩 묶어서 1회 호출 → API 호출 절약
  *
  * [동작 방식]
  * 1. 주기적으로 AI 분석 안 된 뉴스 조회 (aiResult = null)
- * 2. 최대 5개씩 배치로 Gemini API 호출
+ * 2. 최대 3개씩 배치로 Gemini API 호출
  * 3. 분석 결과를 각 뉴스에 업데이트
  *
  * [실행 주기]
  * - 30초마다 실행 (Gemini 무료 티어 Rate Limit 고려)
- * - 한 번에 최대 5개 처리
+ * - 한 번에 최대 3개 처리
  */
 @Slf4j
 @Service
@@ -38,17 +38,17 @@ public class NewsAnalysisScheduler {
     private final GeminiService geminiService;
 
     /** 배치 크기: 한 번에 분석할 뉴스 개수 */
-    private static final int BATCH_SIZE = 5;
+    private static final int BATCH_SIZE = 3;
 
     /**
      * AI 분석 배치 작업 (30초마다 실행)
      *
      * [Rate Limit 고려]
      * - Gemini 무료 티어: 분당 15회 제한
-     * - 30초 간격 + 5개 배치 = 분당 2회 호출 (여유 있음)
+     * - 30초 간격 + 3개 배치 = 분당 2회 호출 (여유 있음)
      *
      * [처리 흐름]
-     * 1. aiResult가 null인 뉴스 5개 조회
+     * 1. aiResult가 null인 뉴스 3개 조회
      * 2. 없으면 스킵
      * 3. Gemini 배치 분석 호출
      * 4. 각 뉴스에 결과 업데이트

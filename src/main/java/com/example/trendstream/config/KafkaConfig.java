@@ -46,8 +46,8 @@ public class KafkaConfig {
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "news-group");
 
-        // 🔥 [핵심 1] 욕심 부리지 말고 1개씩만 가져와라! (과식 방지)
-        config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
+        // Consumer는 DB 저장만 담당 → 빠르게 소비 (Rate Limit은 Scheduler가 관리)
+        config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10);
 
         // JSON을 자바 객체(NewsMessage)로 다시 변환하는 설정
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
@@ -66,8 +66,8 @@ public class KafkaConfig {
         ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
 
-        // 🔥 [핵심 2] 하나 처리했으면 15초(15000ms) 동안 쉬어라! (속도 제한)
-        factory.getContainerProperties().setIdleBetweenPolls(15000);
+        // DB 저장만 하므로 긴 대기 불필요, 방어적으로 1초 간격 유지 (AI Rate Limit은 Scheduler에서 제어)
+        factory.getContainerProperties().setIdleBetweenPolls(1000);
 
         return factory;
     }
