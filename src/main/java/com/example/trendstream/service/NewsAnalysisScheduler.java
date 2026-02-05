@@ -1,8 +1,12 @@
 package com.example.trendstream.service;
 
 import com.example.trendstream.domain.entity.News;
+import com.example.trendstream.domain.entity.NewsTag;
+import com.example.trendstream.domain.entity.Tag;
 import com.example.trendstream.domain.vo.AiResponse;
 import com.example.trendstream.repository.NewsRepository;
+import com.example.trendstream.repository.NewsTagRepository;
+import com.example.trendstream.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -12,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 뉴스 AI 분석 스케줄러 (배치 처리)
@@ -36,6 +41,8 @@ public class NewsAnalysisScheduler {
 
     private final NewsRepository newsRepository;
     private final GeminiService geminiService;
+    private final TagRepository tagRepository;
+    private final NewsTagRepository newsTagRepository;
 
     /** 배치 크기: 한 번에 분석할 뉴스 개수 */
     private static final int BATCH_SIZE = 3;
@@ -78,6 +85,7 @@ public class NewsAnalysisScheduler {
             AiResponse aiResult = results.get(i);
 
             news.updateAiResult(aiResult);
+            saveKeywordsAsTags(news, aiResult);
             log.info(">>>> [분석 완료] ID: {}, 제목: {}, 점수: {}",
                     news.getId(),
                     news.getTitle().substring(0, Math.min(20, news.getTitle().length())) + "...",
@@ -88,5 +96,35 @@ public class NewsAnalysisScheduler {
         newsRepository.saveAll(unprocessedNews);
 
         log.info(">>>> [Scheduler] 배치 분석 완료: {}개 처리됨", unprocessedNews.size());
+    }
+
+    /**
+     * AI 분석 키워드를 Tag/NewsTag 테이블에 저장
+     *
+     * [처리 흐름]
+     * 1. AiResponse의 keywords 리스트를 순회
+     * 2. 소문자 정규화 ("Spring" → "spring") → 중복 방지
+     * 3. Tag find-or-create 패턴으로 태그 조회/생성
+     * 4. NewsTag 연관관계 생성
+     */
+    private void saveKeywordsAsTags(News news, AiResponse aiResult) {
+        if (aiResult.getKeywords() == null || aiResult.getKeywords().isEmpty()) {
+            return;
+        }
+
+        for (String keyword : aiResult.getKeywords()) {
+            String normalized = keyword.strip().toLowerCase(Locale.ROOT);
+            if (normalized.isEmpty()) {
+                continue;
+            }
+
+            Tag tag = tagRepository.findByName(normalized)
+                    .orElseGet(() -> tagRepository.save(new Tag(normalized)));
+
+            newsTagRepository.save(new NewsTag(news, tag));
+        }
+
+        log.debug(">>>> [Tag 저장] 뉴스 ID: {}, 키워드 {}개 저장",
+                news.getId(), aiResult.getKeywords().size());
     }
 }

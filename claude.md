@@ -42,10 +42,11 @@
 ```
 [Step 1] NaverNewsProducer → Kafka (topic: dev-news)
 [Step 2] NewsConsumer → 중복 체크 → DB 저장 (aiResult = null)
-[Step 3] NewsAnalysisScheduler → 5개씩 배치 조회
+[Step 3] NewsAnalysisScheduler → 3개씩 배치 조회
 [Step 4] GeminiService.analyzeBatchNews() → 배치 AI 분석
-[Step 5] 분석 결과 DB 업데이트
+[Step 5] 분석 결과 DB 업데이트 + keywords → Tag/NewsTag 저장
 [Step 6] NewsController → REST API로 데이터 제공
+[Step 7] TrendController → 키워드 빈도 집계 → 트렌드 순위 API
 ```
 
 ## 3. Project Structure
@@ -55,7 +56,8 @@ src/main/java/com/example/trendstream/
 ├── config/
 │   └── KafkaConfig.java
 ├── controller/
-│   └── NewsController.java
+│   ├── NewsController.java
+│   └── TrendController.java
 ├── domain/
 │   ├── entity/
 │   │   ├── News.java
@@ -69,15 +71,18 @@ src/main/java/com/example/trendstream/
 │   ├── GeminiInterfaceDto.java
 │   ├── NaverApiDto.java
 │   ├── NewsMessage.java
-│   └── NewsResponseDto.java
+│   ├── NewsResponseDto.java
+│   └── TrendResponseDto.java
 ├── repository/
 │   ├── NewsRepository.java
-│   └── NewsTagRepository.java
+│   ├── NewsTagRepository.java
+│   └── TagRepository.java
 └── service/
     ├── GeminiService.java              # analyzeBatchNews() 배치 분석
     ├── NaverNewsProducer.java
     ├── NewsConsumer.java               # DB 저장만 담당
-    ├── NewsAnalysisScheduler.java      # 배치 분석 스케줄러 (신규)
+    ├── NewsAnalysisScheduler.java      # 배치 분석 + Tag 저장
+    ├── TrendService.java               # 트렌드 키워드 집계
     └── NewsService.java
 ```
 
@@ -95,6 +100,7 @@ src/main/java/com/example/trendstream/
 | `/api/news/{id}` | GET | 뉴스 상세 조회 |
 | `/api/news/search?keyword=xxx` | GET | 키워드 검색 (제목, 설명) |
 | `/api/news/popular` | GET | AI 중요도 점수순 정렬 |
+| `/api/trends?period=24h&limit=10` | GET | 트렌드 키워드 순위 (기간별) |
 
 **Swagger UI**: `http://localhost:8081/swagger-ui.html`
 
@@ -105,6 +111,9 @@ src/main/java/com/example/trendstream/
 - `searchByKeyword()`: 키워드 검색
 - `findAllByOrderByScoreDesc()`: JSON 필드 기반 정렬 (Native Query)
 - `findByAiResultIsNull()`: AI 분석 대기 뉴스 조회 (배치용)
+- `TagRepository.findByName()`: 태그 find-or-create 패턴
+- `NewsTagRepository.findTopTrendingSince()`: 트렌드 키워드 빈도 집계 (Native Query)
+- `NewsTagRepository.findRecentNewsByTagName()`: 키워드별 관련 뉴스 조회 (Native Query)
 
 ## 5. Infrastructure
 | Service | Port | Description |
@@ -118,9 +127,10 @@ src/main/java/com/example/trendstream/
 ## 6. Current Status
 - ✅ 인프라 구축 완료 (Docker)
 - ✅ 데이터 파이프라인 완료 (Naver → Kafka → DB)
-- ✅ AI 배치 분석 완료 (5개씩 묶어서 처리)
+- ✅ AI 배치 분석 완료 (3개씩 묶어서 처리)
 - ✅ REST API 개발 완료 (NewsController)
 - ✅ Swagger 문서화 완료
+- ✅ 실시간 트렌드 분석 완료 (TrendController)
 
 ## 7. 향후 개발 방향 (Roadmap)
 
@@ -131,7 +141,7 @@ src/main/java/com/example/trendstream/
 ### 2단계: 서비스 가치 증대 (Current)
 - **프론트엔드 개발**: Next.js로 뉴스 목록 UI 개발 (별도 저장소)
 - **Ollama 하이브리드**: 로컬 LLM 도입으로 API 한도 완전 해결 (계획 중)
-- **실시간 트렌드 분석**: 키워드 집계 → 트렌드 순위 표시
+- ~~**실시간 트렌드 분석**: 키워드 집계 → 트렌드 순위 표시~~ ✅
 - **검색 기능 고도화**: AI 요약 검색, Elasticsearch 도입 검토
 
 ### 3단계: 개인화 및 확장 (Long-term)
