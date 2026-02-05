@@ -61,46 +61,98 @@ org.hibernate.query.sqm.PathElementException: Could not resolve attribute 'strin
 
 ---
 
+### 3. 네이버 API 응답 인코딩 문제 (HTML 엔티티 + UTF-8 깨짐)
+**날짜**: 2026-02-06
+
+**증상**:
+- 제목에 `&quot;`, `&amp;` 등 HTML 엔티티가 그대로 노출
+- 일부 뉴스 제목이 `ë��ì�¸ ë�¹ì�...`처럼 깨져서 저장됨
+
+**원인**:
+1. **HTML 엔티티**: 네이버 API가 HTML 인코딩된 문자열을 반환. `replaceAll("<[^>]*>", "")`로 태그만 제거하고 엔티티(`&quot;` 등)는 디코딩하지 않음
+2. **UTF-8 깨짐**: `MappingJackson2HttpMessageConverter`가 응답 헤더의 charset을 따르면서 UTF-8 한글이 깨짐. `StringHttpMessageConverter`만 UTF-8 설정하고 Jackson 컨버터는 누락
+
+**해결 방법**:
+1. `decodeHtml()` 메서드 추가 — `&quot;`, `&amp;`, `&lt;`, `&gt;`, `&apos;`, `&#39;` 디코딩
+2. `MappingJackson2HttpMessageConverter`에도 `setDefaultCharset(UTF_8)` 강제 지정
+
+**수정 파일**:
+- `NaverNewsProducer.java`: `decodeHtml()` 추가, Jackson 컨버터 UTF-8 설정
+
+**주의사항**:
+> 수정 이전에 DB에 저장된 깨진 데이터는 자동으로 복구되지 않음. 필요 시 수동 정리 또는 재수집 필요.
+
+---
+
+## 개발 기록 (Development Log)
+
+### 1. Ollama 로컬 LLM 하이브리드 도입
+**날짜**: 2026-02-06
+
+**배경**:
+- Gemini API 무료 티어 한도 제한 (분당 15회)
+- 배치 처리로 80% 절약했지만 여전히 한도 존재
+- 로컬 LLM 도입으로 API 의존도 완전 제거 필요
+
+**설계 — Strategy 패턴 기반 하이브리드 구조**:
+```
+application.properties: ai.provider=ollama (or gemini)
+                              │
+NewsAnalysisScheduler ──→ AiAnalyzer (인터페이스)
+                              ├── OllamaService (implements) — 로컬 LLM
+                              └── GeminiService (implements) — 외부 API
+```
+
+**구현 내용**:
+
+| 파일 | 변경 | 설명 |
+|-----|------|------|
+| `service/AiAnalyzer.java` | 신규 | `analyzeBatchNews()` 공통 인터페이스 |
+| `service/OllamaService.java` | 신규 | Ollama REST API 호출 (`POST /api/generate`) |
+| `config/AiConfig.java` | 신규 | `ai.provider` 값에 따라 빈 선택 |
+| `service/GeminiService.java` | 수정 | `implements AiAnalyzer` 추가 |
+| `service/NewsAnalysisScheduler.java` | 수정 | `GeminiService` → `AiAnalyzer` 의존 변경 |
+| `application.properties` | 수정 | `ai.provider`, `ollama.api.url`, `ollama.model` 추가 |
+
+**핵심 설계 결정**:
+1. **Strategy 패턴**: `AiAnalyzer` 인터페이스로 추상화하여 런타임에 구현체 교체 가능
+2. **프롬프트 재사용**: GeminiService와 OllamaService가 동일한 프롬프트 사용 → 분석 결과 일관성 유지
+3. **설정 기반 전환**: `ai.provider` 프로퍼티 한 줄로 ollama/gemini 전환 (재배포 없이 변경 가능)
+4. **기존 코드 영향 최소화**: 스케줄러만 의존 타입 변경, 나머지 로직 그대로 유지
+
+**전환 방법**:
+```properties
+# Ollama 사용 (로컬, 무제한)
+ai.provider=ollama
+ollama.model=gemma3:4b
+
+# Gemini 사용 (외부 API)
+ai.provider=gemini
+```
+
+**사전 작업 (Ollama)**:
+```bash
+# 1. Ollama 설치: https://ollama.com/download
+# 2. 모델 다운로드
+ollama pull gemma3:4b
+# 3. 서버 실행 확인
+ollama list
+```
+
+**효과**:
+| 항목 | Gemini (기존) | Ollama (신규) |
+|-----|-------------|--------------|
+| API 비용 | 무료 티어 한도 있음 | 0원 (로컬) |
+| Rate Limit | 분당 15회 | 무제한 |
+| 데이터 프라이버시 | 외부 전송 | 로컬 처리 |
+| 분석 품질 | 높음 | 모델에 따라 다름 |
+
+---
+
 ## 향후 개선점 (Improvements)
 
-### 1. Ollama 로컬 LLM 하이브리드 (예정)
-**우선순위**: 높음 (API 한도 완전 해결)
-**상태**: 계획 중
-
-**현재 상태**:
-- Gemini API 무료 티어 사용 중
-- 배치 처리로 80% 절약했지만 여전히 한도 존재
-
-**개선 방안**: Ollama + Gemini 하이브리드
-```
-[일반 뉴스] → Ollama (로컬, 무제한)
-[중요 뉴스] → Gemini API (고품질)
-```
-
-**Ollama 설정**:
-```bash
-# 설치
-curl -fsSL https://ollama.com/install.sh | sh
-
-# 모델 다운로드
-ollama pull llama3.1      # 8GB VRAM
-ollama pull mistral       # 8GB VRAM
-ollama pull phi3:mini     # 4GB VRAM (가벼움)
-
-# API 엔드포인트
-http://localhost:11434/api/generate
-```
-
-**구현 계획**:
-1. `OllamaService` 생성 (GeminiService와 동일 인터페이스)
-2. `AiAnalyzer` 인터페이스 추출
-3. 설정으로 Ollama/Gemini 선택 가능하게
-4. 또는 점수 기반 자동 선택
-
-**기대 효과**:
-- API 비용: 0원 (로컬 처리)
-- 분석 속도: 약간 느림 (허용 범위)
-- 데이터 프라이버시: 외부 전송 없음
+### ~~1. Ollama 로컬 LLM 하이브리드~~ ✅ 완료 (2026-02-06)
+> 개발 기록 섹션 참고
 
 ---
 
@@ -157,12 +209,200 @@ CREATE INDEX idx_ai_score ON news(ai_score DESC);
 
 ---
 
+## SQL 쿼리 정리 (면접 대비)
+
+### 1. `existsByLink(String link)` — 중복 체크
+**쿼리 메서드** (Spring Data JPA 자동 생성)
+```sql
+SELECT EXISTS(SELECT 1 FROM news WHERE link = ?)
+```
+**사용 이유**: Kafka Consumer에서 뉴스 저장 전 중복 방지. `SELECT *` 대신 `EXISTS`를 쓰면 일치하는 행을 찾는 즉시 탐색을 멈추므로 효율적이다.
+
+**인덱스 활용**: `link` 컬럼에 `UNIQUE` 제약조건이 걸려 있어 자동으로 유니크 인덱스 생성 → 인덱스 스캔으로 O(log n) 조회.
+
+---
+
+### 2. `findAllWithTags()` — N+1 문제 해결 (FETCH JOIN)
+**JPQL**
+```sql
+SELECT DISTINCT n FROM News n
+  LEFT JOIN FETCH n.newsTags nt
+  LEFT JOIN FETCH nt.tag
+ORDER BY n.pubDate DESC
+```
+**사용 이유**: 뉴스 목록 + 태그를 **1번의 쿼리**로 조회. 일반 `findAll()`은 N+1 문제 발생 (뉴스 10개 → 태그 조회 10번 추가 = 11번).
+
+**핵심 키워드**:
+| 키워드 | 설명 |
+|-------|------|
+| `LEFT JOIN FETCH` | 태그 없는 뉴스도 포함 + 연관 엔티티 즉시 로딩 (INNER면 태그 없는 뉴스 누락) |
+| `DISTINCT` | JOIN으로 인한 중복 행 제거. 뉴스 1개 + 태그 3개 → 3행이 되는 걸 1행으로 합침 |
+| `FETCH` | 일반 JOIN은 SELECT 절에만 반영. FETCH는 영속성 컨텍스트에 로딩하여 LazyInitializationException 방지 |
+
+**면접 포인트**: "N+1 문제가 뭔가요?" → 연관 엔티티를 Lazy Loading으로 조회할 때, 부모 N개에 대해 자식을 각각 1번씩 추가 쿼리하는 문제. FETCH JOIN으로 해결.
+
+**최적화 가능**: 현재는 전체 뉴스를 가져오므로 Pageable 미지원. 데이터 증가 시 `@EntityGraph` + Pageable 조합으로 변경 검토. (FETCH JOIN + Pageable은 메모리에서 페이징하는 문제 있음 → HHH000104 경고)
+
+---
+
+### 3. `findByIdWithTags(Long id)` — 상세 조회 (FETCH JOIN)
+**JPQL**
+```sql
+SELECT n FROM News n
+  LEFT JOIN FETCH n.newsTags nt
+  LEFT JOIN FETCH nt.tag
+WHERE n.id = :id
+```
+**사용 이유**: 뉴스 상세 조회 시 태그까지 1번에 가져오기. PK 조건이므로 `DISTINCT` 불필요.
+
+**인덱스 활용**: `WHERE n.id = :id`는 PK 인덱스 사용 → O(log n).
+
+---
+
+### 4. `searchByKeyword(String keyword, Pageable pageable)` — 키워드 검색
+**JPQL**
+```sql
+SELECT n FROM News n
+WHERE n.title LIKE %:keyword% OR n.description LIKE %:keyword%
+```
+**사용 이유**: 제목 또는 설명에 키워드가 포함된 뉴스 검색.
+
+**성능 이슈**: `%keyword%` (앞뒤 와일드카드)는 **인덱스 사용 불가 → Full Table Scan**.
+- B-Tree 인덱스는 접두사 매칭(`keyword%`)만 가능
+- 양쪽 `%`면 모든 행을 순차 탐색
+
+**최적화 방안**:
+1. **MySQL Full-Text Index**: `MATCH(title, description) AGAINST(:keyword IN BOOLEAN MODE)` → 역인덱스 기반 검색
+2. **Elasticsearch 도입**: 형태소 분석, 유사어 검색, 랭킹 알고리즘 지원
+3. **Generated Column**: 자주 검색하는 패턴이면 가상 컬럼 + 인덱스 조합
+
+---
+
+### 5. `findByAiResultIsNull(Pageable pageable)` — 미분석 뉴스 조회
+**쿼리 메서드** (자동 생성)
+```sql
+SELECT * FROM news WHERE ai_result IS NULL LIMIT ? OFFSET ?
+```
+**사용 이유**: 스케줄러에서 AI 분석 안 된 뉴스를 배치로 가져오기. Pageable로 BATCH_SIZE 제어.
+
+**인덱스 고려**: `ai_result IS NULL` 조건에 인덱스가 없어 Full Table Scan. 현재 데이터량에서는 문제없지만, 대부분의 뉴스가 분석 완료된 상태에서 소수의 NULL을 찾는 경우 부분 인덱스가 유용할 수 있음. (MySQL은 부분 인덱스 미지원 → Generated Column으로 우회 가능)
+
+---
+
+### 6. `findByAiResultFailed(Pageable pageable)` — 분석 실패 뉴스 재조회
+**Native Query**
+```sql
+SELECT * FROM news WHERE ai_result ->> '$.summary' = '분석 실패'
+```
+**사용 이유**: JSON 내부 필드 값으로 필터링. JPQL은 JSON 함수 미지원이라 Native Query 필수.
+
+**`->>` vs `JSON_EXTRACT()` 차이 (면접 빈출)**:
+| 연산자 | 반환 | 예시 결과 |
+|-------|------|----------|
+| `JSON_EXTRACT(col, '$.key')` | JSON 타입 (따옴표 포함) | `"분석 실패"` |
+| `col ->> '$.key'` | 문자열 타입 (따옴표 제거) | `분석 실패` |
+
+`->>`는 `JSON_UNQUOTE(JSON_EXTRACT(...))`의 축약. 문자열 비교 시 반드시 `->>` 사용해야 정상 매칭.
+
+**최적화 가능**: 자주 조회한다면 Generated Column 도입:
+```sql
+ALTER TABLE news ADD COLUMN ai_summary VARCHAR(255)
+  GENERATED ALWAYS AS (ai_result ->> '$.summary') STORED;
+CREATE INDEX idx_ai_summary ON news(ai_summary);
+```
+
+---
+
+### 7. `findAllByOrderByScoreDesc(Pageable pageable)` — AI 점수순 정렬
+**Native Query**
+```sql
+SELECT * FROM news
+WHERE ai_result IS NOT NULL
+ORDER BY JSON_EXTRACT(ai_result, '$.score') DESC
+```
+**사용 이유**: JSON 내부 `score` 값 기준 정렬. JPQL은 JSON 함수 미지원.
+
+**countQuery 별도 지정 이유**: Native Query + Pageable 조합에서 Spring Data JPA는 `COUNT(*)` 쿼리를 자동 생성 못함. `countQuery`를 명시하지 않으면 파싱 에러 발생.
+
+**성능 이슈**: `ORDER BY JSON_EXTRACT(...)` → 매 정렬 시 JSON 파싱 필요 → 데이터 증가 시 느려짐.
+
+**최적화 방안** (Generated Column + 인덱스):
+```sql
+ALTER TABLE news ADD COLUMN ai_score INT
+  GENERATED ALWAYS AS (JSON_EXTRACT(ai_result, '$.score')) STORED;
+CREATE INDEX idx_ai_score ON news(ai_score DESC);
+
+-- 최적화 후 쿼리
+SELECT * FROM news WHERE ai_score IS NOT NULL ORDER BY ai_score DESC;
+```
+→ JSON 파싱 없이 인덱스 스캔으로 정렬. O(n log n) → O(log n).
+
+---
+
+### 8. `findTopTrendingSince(LocalDateTime since, int limit)` — 트렌드 집계
+**Native Query**
+```sql
+SELECT t.name AS tag_name, COUNT(nt.id) AS cnt
+FROM news_tags nt
+  JOIN tags t ON nt.tag_id = t.id
+  JOIN news n ON nt.news_id = n.id
+WHERE n.pub_date >= :since
+GROUP BY t.name
+ORDER BY cnt DESC
+LIMIT :limit
+```
+**사용 이유**: 기간 내 키워드 빈도를 집계하여 트렌드 순위 산출. 3-테이블 JOIN + GROUP BY + COUNT 필요.
+
+**실행 순서** (면접 빈출: SQL 실행 순서):
+```
+FROM → JOIN → WHERE → GROUP BY → SELECT(COUNT) → ORDER BY → LIMIT
+```
+
+**인덱스 활용**:
+- `news.pub_date`에 인덱스 있음 (`idx_pub_date`) → WHERE 범위 검색 최적화
+- `news_tags.tag_id`, `news_tags.news_id`는 FK로 인덱스 자동 생성 → JOIN 최적화
+
+**최적화 가능**: 트렌드 조회가 빈번하면 **Materialized View** 또는 별도 집계 테이블을 두고 스케줄러로 주기적 갱신하는 CQRS 패턴 검토.
+
+---
+
+### 9. `findRecentNewsByTagName(...)` — 키워드별 관련 뉴스
+**Native Query**
+```sql
+SELECT n.id, n.title, n.link
+FROM news_tags nt
+  JOIN tags t ON nt.tag_id = t.id
+  JOIN news n ON nt.news_id = n.id
+WHERE t.name = :tagName AND n.pub_date >= :since
+ORDER BY n.pub_date DESC
+LIMIT :limit
+```
+**사용 이유**: 특정 트렌드 키워드를 클릭하면 관련 뉴스 목록 제공. 필요한 컬럼(id, title, link)만 SELECT하여 네트워크 비용 절감.
+
+**SELECT 절 최적화 포인트**: `SELECT *` 대신 필요한 3개 컬럼만 조회 → 불필요한 `description(TEXT)`, `ai_result(JSON)` 전송 안 함.
+
+---
+
+### 쿼리 유형 요약 (JPQL vs Native Query vs 쿼리 메서드)
+
+| 유형 | 사용 조건 | 프로젝트 예시 |
+|-----|----------|-------------|
+| **쿼리 메서드** | 단순 조건 (필드명 기반) | `existsByLink()`, `findByAiResultIsNull()` |
+| **JPQL** | 엔티티 기반 쿼리, FETCH JOIN | `findAllWithTags()`, `searchByKeyword()` |
+| **Native Query** | JSON 함수, GROUP BY 집계, DB 종속 기능 | `findAllByOrderByScoreDesc()`, `findTopTrendingSince()` |
+
+**면접 팁**: "왜 Native Query를 썼나요?" → JPQL은 데이터베이스에 종속적이지 않은 객체 지향 쿼리라 `JSON_EXTRACT`, `GROUP BY + LIMIT` 같은 DB 종속 기능은 지원하지 않는다. 이런 경우에만 Native Query를 선택적으로 사용했다.
+
+---
+
 ## 해결된 이슈 히스토리
 
 | 날짜 | 이슈 | 해결 방법 |
 |-----|-----|---------|
 | 2026-02-03 | JPQL ORDER BY + Pageable 충돌 | 쿼리에서 ORDER BY 제거, Pageable에 위임 |
 | 2026-02-03 | Gemini API 한도 빠른 소진 | 배치 처리 도입 (5개씩 묶어서 호출) |
+| 2026-02-06 | 뉴스 제목 HTML 엔티티 노출 + UTF-8 깨짐 | decodeHtml() 추가, Jackson 컨버터 UTF-8 설정 |
+| 2026-02-06 | Ollama 로컬 LLM 하이브리드 도입 | AiAnalyzer 인터페이스 + Strategy 패턴으로 ollama/gemini 전환 |
 
 ---
 

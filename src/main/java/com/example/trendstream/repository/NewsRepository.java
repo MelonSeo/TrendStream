@@ -144,6 +144,24 @@ public interface NewsRepository extends JpaRepository<News, Long> {
     Page<News> findByAiResultIsNull(Pageable pageable);
 
     /**
+     * AI 분석 실패 뉴스 조회 (재분석용)
+     *
+     * [사용처]
+     * - NewsAnalysisScheduler에서 분석 실패한 뉴스 재처리
+     * - aiResult의 summary가 '분석 실패'인 뉴스 조회
+     *
+     * [Native Query 사용 이유]
+     * - JSON 내부 필드(summary) 접근 필요 → JSON_EXTRACT 사용
+     *
+     * @param pageable 페이지 정보 (size로 배치 크기 제어)
+     * @return 분석 실패한 뉴스 목록
+     */
+    @Query(value = "SELECT * FROM news WHERE ai_result ->> '$.summary' = '분석 실패'",
+            countQuery = "SELECT COUNT(*) FROM news WHERE ai_result ->> '$.summary' = '분석 실패'",
+            nativeQuery = true)
+    Page<News> findByAiResultFailed(Pageable pageable);
+
+    /**
      * AI 중요도 점수순 정렬 (Native Query)
      *
      * [Native Query 사용 이유]

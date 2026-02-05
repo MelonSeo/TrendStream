@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -54,11 +56,25 @@ public class NaverNewsProducer {
         log.info(">>>> [NaverNewsProducer] 전체 뉴스 수집을 완료했습니다.");
     }
 
+    private String decodeHtml(String text) {
+        if (text == null) return null;
+        return text
+                .replace("&quot;", "\"")
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&apos;", "'")
+                .replace("&#39;", "'");
+    }
+
     private void crawlAndSendNewsForKeyword(String keyword) {
-        // RestTemplate을 이 메소드 내에서 생성하고 UTF-8 설정을 추가합니다.
         RestTemplate restTemplate = new RestTemplate();
         restTemplate.getMessageConverters()
                 .add(0, new StringHttpMessageConverter(StandardCharsets.UTF_8));
+        restTemplate.getMessageConverters().stream()
+                .filter(c -> c instanceof MappingJackson2HttpMessageConverter)
+                .map(c -> (MappingJackson2HttpMessageConverter) c)
+                .forEach(c -> c.setDefaultCharset(StandardCharsets.UTF_8));
 
         log.info(">>>> [NaverNewsProducer] '{}' 키워드 뉴스 수집 시작...", keyword);
 
@@ -89,10 +105,13 @@ public class NaverNewsProducer {
                         continue;
                     }
 
+                    String cleanTitle = decodeHtml(item.getTitle().replaceAll("<[^>]*>", ""));
+                    String cleanDesc = decodeHtml(item.getDescription().replaceAll("<[^>]*>", ""));
+
                     NewsMessage message = NewsMessage.builder()
-                            .title(item.getTitle().replaceAll("<[^>]*>", ""))
+                            .title(cleanTitle)
                             .link(link)
-                            .description(item.getDescription().replaceAll("<[^>]*>", ""))
+                            .description(cleanDesc)
                             .source("Naver API")
                             .type(NewsType.NEWS)
                             .pubDateStr(item.getPubDate())

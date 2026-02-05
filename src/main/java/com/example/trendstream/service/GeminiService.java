@@ -31,7 +31,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class GeminiService {
+public class GeminiService implements AiAnalyzer {
 
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate = new RestTemplate();
@@ -56,6 +56,7 @@ public class GeminiService {
      * @param newsList 분석할 뉴스 목록 (최대 5개 권장)
      * @return 분석 결과 목록 (입력 순서와 동일)
      */
+    @Override
     public List<AiResponse> analyzeBatchNews(List<News> newsList) {
         if (newsList == null || newsList.isEmpty()) {
             return new ArrayList<>();
