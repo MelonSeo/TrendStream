@@ -34,6 +34,7 @@ public class NewsResponseDto {
     private LocalDateTime pubDate;    // 발행일시
     private AiResponse aiResult;      // AI 분석 결과 (요약, 감정, 키워드, 점수)
     private List<String> tags;        // 태그 목록 (예: ["Spring", "Kafka"])
+    private String searchKeyword;     // 검색에 사용된 키워드 (백엔드, AI, 클라우드 등)
 
     /**
      * Entity -> DTO 변환 정적 팩토리 메서드

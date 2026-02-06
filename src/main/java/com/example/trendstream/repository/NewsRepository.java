@@ -110,25 +110,28 @@ public interface NewsRepository extends JpaRepository<News, Long> {
     Page<News> findAllByOrderByPubDateDesc(Pageable pageable);
 
     /**
-     * 키워드 검색 (제목 + 설명)
+     * 키워드 검색 (제목 + 설명 + AI 요약)
      *
-     * [LIKE 검색]
-     * - %keyword%: 키워드가 어디든 포함되면 매칭
-     * - 앞뒤로 %가 붙어 인덱스 사용 불가 (Full Table Scan)
-     * - 데이터 많아지면 Elasticsearch 도입 필요
+     * [검색 대상]
+     * - title: 뉴스 제목
+     * - description: 뉴스 설명
+     * - ai_result.summary: AI가 생성한 요약
      *
-     * [OR 조건]
-     * - 제목 OR 설명 중 하나라도 매칭되면 결과에 포함
-     *
-     * [정렬 처리]
-     * - ORDER BY를 쿼리에서 제거하고 Pageable에 위임
-     * - Controller의 @PageableDefault에서 기본 정렬 지정
+     * [Native Query 사용 이유]
+     * - JSON 내부 필드(summary) 접근 필요 → JSON_EXTRACT 사용
      *
      * @param keyword 검색할 키워드
-     * @param pageable 페이지 정보 (정렬 포함)
+     * @param pageable 페이지 정보
      * @return 검색 결과
      */
-    @Query("SELECT n FROM News n WHERE n.title LIKE %:keyword% OR n.description LIKE %:keyword%")
+    @Query(value = "SELECT * FROM news WHERE title LIKE CONCAT('%', :keyword, '%') " +
+            "OR description LIKE CONCAT('%', :keyword, '%') " +
+            "OR (ai_result IS NOT NULL AND ai_result ->> '$.summary' LIKE CONCAT('%', :keyword, '%')) " +
+            "ORDER BY pub_date DESC",
+            countQuery = "SELECT COUNT(*) FROM news WHERE title LIKE CONCAT('%', :keyword, '%') " +
+                    "OR description LIKE CONCAT('%', :keyword, '%') " +
+                    "OR (ai_result IS NOT NULL AND ai_result ->> '$.summary' LIKE CONCAT('%', :keyword, '%'))",
+            nativeQuery = true)
     Page<News> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
     /**
@@ -186,4 +189,27 @@ public interface NewsRepository extends JpaRepository<News, Long> {
             countQuery = "SELECT COUNT(*) FROM news WHERE ai_result IS NOT NULL",
             nativeQuery = true)
     Page<News> findAllByOrderByScoreDesc(Pageable pageable);
+
+    /**
+     * 태그(키워드) 기반 검색
+     *
+     * [장점]
+     * - 정확한 태그 매칭 (인덱스 사용 가능)
+     * - AI가 추출한 키워드로 검색
+     *
+     * @param tagName 검색할 태그 이름
+     * @param pageable 페이지 정보
+     * @return 해당 태그가 있는 뉴스 목록
+     */
+    @Query(value = "SELECT DISTINCT n.* FROM news n " +
+            "JOIN news_tags nt ON n.id = nt.news_id " +
+            "JOIN tags t ON nt.tag_id = t.id " +
+            "WHERE t.name = :tagName " +
+            "ORDER BY n.pub_date DESC",
+            countQuery = "SELECT COUNT(DISTINCT n.id) FROM news n " +
+                    "JOIN news_tags nt ON n.id = nt.news_id " +
+                    "JOIN tags t ON nt.tag_id = t.id " +
+                    "WHERE t.name = :tagName",
+            nativeQuery = true)
+    Page<News> findByTagName(@Param("tagName") String tagName, Pageable pageable);
 }

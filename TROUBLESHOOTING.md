@@ -156,36 +156,59 @@ ollama list
 
 ---
 
-### 2. JSON 필드 인덱싱 최적화
-**우선순위**: 중간 (데이터 증가 시 필요)
+### 2. JSON 필드 인덱싱 최적화 (Generated Column 활용)
+**우선순위**: 중간 (데이터 10,000건 이상 시 적용)
 
-**현재 상태**:
-- `ai_result` JSON 컬럼의 `score` 값으로 정렬 시 Full Table Scan 발생
-- 데이터가 적을 때는 문제없지만, 수만 건 이상이면 성능 저하
+**대상 쿼리 3개**:
+| 쿼리 | 현재 문제 | 최적화 방안 |
+|-----|----------|------------|
+| `findAllByOrderByScoreDesc()` | JSON 파싱 후 정렬 | ai_score 가상 컬럼 |
+| `findByAiResultIsNull()` | ai_result NULL 체크 | is_analyzed 가상 컬럼 |
+| `findByAiResultFailed()` | JSON 내부 문자열 비교 | ai_summary 가상 컬럼 |
 
-**현재 쿼리**:
+**적용할 SQL 마이그레이션**:
 ```sql
-SELECT * FROM news
-WHERE ai_result IS NOT NULL
-ORDER BY JSON_EXTRACT(ai_result, '$.score') DESC
+-- ============================================
+-- TrendStream JSON 필드 최적화 마이그레이션
+-- 적용 시점: 데이터 10,000건 이상 축적 시
+-- 실행 전 백업 권장
+-- ============================================
+
+-- 1. AI 점수 가상 컬럼 (인기순 정렬 최적화)
+-- 영향: findAllByOrderByScoreDesc() → O(n log n) → O(log n)
+ALTER TABLE news ADD COLUMN ai_score INT
+GENERATED ALWAYS AS (JSON_EXTRACT(ai_result, '$.score')) STORED;
+CREATE INDEX idx_ai_score ON news(ai_score DESC);
+
+-- 2. 분석 완료 여부 가상 컬럼 (미분석 뉴스 조회 최적화)
+-- 영향: findByAiResultIsNull() → Full Table Scan → Index Scan
+ALTER TABLE news ADD COLUMN is_analyzed TINYINT(1)
+GENERATED ALWAYS AS (CASE WHEN ai_result IS NULL THEN 0 ELSE 1 END) STORED;
+CREATE INDEX idx_is_analyzed ON news(is_analyzed);
+
+-- 3. AI 요약 가상 컬럼 (분석 실패 조회 최적화)
+-- 영향: findByAiResultFailed() → JSON 파싱 제거
+ALTER TABLE news ADD COLUMN ai_summary VARCHAR(500)
+GENERATED ALWAYS AS (ai_result ->> '$.summary') STORED;
+CREATE INDEX idx_ai_summary ON news(ai_summary(100));
 ```
 
-**개선 방안**:
-```sql
--- 1. 가상 컬럼(Generated Column) 생성
-ALTER TABLE news
-ADD COLUMN ai_score INT
-GENERATED ALWAYS AS (JSON_EXTRACT(ai_result, '$.score')) STORED;
+**마이그레이션 후 Repository 쿼리 변경**:
+```java
+// findAllByOrderByScoreDesc
+SELECT * FROM news WHERE ai_score IS NOT NULL ORDER BY ai_score DESC
 
--- 2. 인덱스 추가
-CREATE INDEX idx_ai_score ON news(ai_score DESC);
+// findByAiResultIsNull
+SELECT * FROM news WHERE is_analyzed = 0 LIMIT ?
+
+// findByAiResultFailed
+SELECT * FROM news WHERE ai_summary = '분석 실패' LIMIT ?
 ```
 
 **기대 효과**:
-- JSON 파싱 없이 인덱스로 직접 정렬 가능
-- O(n log n) → O(log n) 성능 개선
-
-**구현 시점**: 뉴스 데이터가 10,000건 이상 축적되었을 때
+- JSON 파싱 오버헤드 제거
+- 인덱스 스캔으로 O(log n) 조회
+- 스케줄러 쿼리 성능 대폭 개선 (10초마다 실행되므로 중요)
 
 ---
 
@@ -403,6 +426,159 @@ LIMIT :limit
 | 2026-02-03 | Gemini API 한도 빠른 소진 | 배치 처리 도입 (5개씩 묶어서 호출) |
 | 2026-02-06 | 뉴스 제목 HTML 엔티티 노출 + UTF-8 깨짐 | decodeHtml() 추가, Jackson 컨버터 UTF-8 설정 |
 | 2026-02-06 | Ollama 로컬 LLM 하이브리드 도입 | AiAnalyzer 인터페이스 + Strategy 패턴으로 ollama/gemini 전환 |
+| 2026-02-07 | application.properties 한글 인코딩 깨짐 | 유니코드 이스케이프 변환 (`\uXXXX`) |
+| 2026-02-07 | Native Query + Pageable sort 충돌 | PageRequest.of()로 sort 제외한 Pageable 생성 |
+
+---
+
+## 개발 기록 - 2026-02-07
+
+### 1. 실시간 트렌드 분석 기능 구현
+
+**배경**: AI가 추출한 keywords를 활용하여 인기 키워드 순위 제공
+
+**구현 내용**:
+
+| 파일 | 액션 | 설명 |
+|-----|------|------|
+| `repository/TagRepository.java` | 신규 | `findByName()` - find-or-create 패턴 |
+| `repository/NewsTagRepository.java` | 수정 | `findTopTrendingSince()`, `findRecentNewsByTagName()` Native Query 추가 |
+| `service/NewsAnalysisScheduler.java` | 수정 | `saveKeywordsAsTags()` - AI 분석 후 키워드를 Tag/NewsTag 테이블에 저장 |
+| `dto/TrendResponseDto.java` | 신규 | keyword, count, relatedNews 필드 |
+| `service/TrendService.java` | 신규 | `getTopTrends(period, limit)` - 기간별 트렌드 집계 |
+| `controller/TrendController.java` | 신규 | `GET /api/trends?period=24h&limit=10` |
+
+**데이터 흐름**:
+```
+AI 분석 완료 → keywords 추출 → Tag/NewsTag 저장 (소문자 정규화)
+                                      ↓
+GET /api/trends → GROUP BY + COUNT → 트렌드 순위 반환
+```
+
+---
+
+### 2. Groq Rate Limit 헤더 로깅 추가
+
+**수정 파일**: `service/GroqService.java`
+
+**변경 내용**:
+- `restTemplate.postForObject()` → `restTemplate.exchange()`로 변경
+- 응답 헤더에서 Rate Limit 정보 추출하여 로깅
+
+**로그 예시**:
+```
+>>>> [Groq Rate Limit] 남은 요청: 29, 남은 토큰: 5765, 리셋까지: 1m30s
+```
+
+---
+
+### 3. Naver API 수집량 증가
+
+**수정 파일**: `service/NaverNewsProducer.java`
+
+**변경**: `queryParam("display", 10)` → `queryParam("display", 50)`
+
+**효과**: 키워드당 10개 → 50개 (5개 키워드 × 50개 = 최대 250개/회)
+
+---
+
+### 4. application.properties 한글 인코딩 문제 해결
+
+**증상**: 키워드 검색이 동작하지 않음
+
+**원인**: `.properties` 파일은 기본적으로 ISO-8859-1로 읽힘 → UTF-8 한글 깨짐
+
+**해결**:
+```properties
+# Before (깨짐)
+naver.api.keywords=백엔드,AI,클라우드,자바,여기어때
+
+# After (유니코드 이스케이프)
+naver.api.keywords=\uBC31\uC5D4\uB4DC,AI,\uD074\uB77C\uC6B0\uB4DC,\uC790\uBC14,\uC5EC\uAE30\uC5B4\uB54C
+```
+
+**IntelliJ 설정** (한글 직접 입력 가능하게):
+- Settings → Editor → File Encodings
+- Default encoding for properties files: `UTF-8`
+- ✅ Transparent native-to-ascii conversion
+
+---
+
+### 5. 프론트엔드 - 분석 중 상태 표시
+
+**수정 파일**: `components/NewsCard.tsx`
+
+**변경 내용**: `aiResult`가 null일 때 표시
+- 점수 뱃지 → "분석 중" (애니메이션 점)
+- 요약 → "AI가 뉴스를 분석하고 있습니다..." (이탤릭)
+- 키워드 → 스켈레톤 로딩 바
+
+---
+
+### 6. 검색 기능 고도화
+
+#### 6.1 AI 요약도 검색 대상에 추가
+
+**수정 파일**: `repository/NewsRepository.java`
+
+**변경**:
+```sql
+-- Before
+WHERE title LIKE '%keyword%' OR description LIKE '%keyword%'
+
+-- After (Native Query)
+WHERE title LIKE CONCAT('%', :keyword, '%')
+   OR description LIKE CONCAT('%', :keyword, '%')
+   OR (ai_result IS NOT NULL AND ai_result ->> '$.summary' LIKE CONCAT('%', :keyword, '%'))
+```
+
+#### 6.2 태그 기반 검색 API 추가
+
+| 파일 | 변경 |
+|-----|------|
+| `NewsRepository.java` | `findByTagName()` Native Query 추가 |
+| `NewsService.java` | `searchByTag()` 메서드 추가 |
+| `NewsController.java` | `GET /api/news/tag?name=xxx` 엔드포인트 추가 |
+
+#### 6.3 프론트엔드 태그 검색 페이지
+
+| 파일 | 변경 |
+|-----|------|
+| `app/api.ts` | `searchByTag()` 함수 추가 |
+| `app/news/tag/page.tsx` | 태그 검색 결과 페이지 (신규) |
+| `components/NewsCard.tsx` | 키워드 클릭 → `/news/tag?name=xxx`로 이동 |
+
+---
+
+### 7. Native Query + Pageable Sort 충돌 해결
+
+**증상**:
+```
+Unknown column 'n.pubDate' in 'order clause'
+[... ORDER BY n.pub_date DESC, n.pubDate desc limit ?]
+```
+
+**원인**:
+- Native Query: `ORDER BY n.pub_date DESC` (DB 컬럼명)
+- Pageable: `ORDER BY n.pubDate DESC` (JPA 필드명) 추가됨
+- MySQL은 `pubDate` 컬럼을 찾지 못함
+
+**해결**:
+```java
+// NewsService.java
+public Page<NewsResponseDto> searchByTag(String tagName, Pageable pageable) {
+    // sort 없는 Pageable 생성
+    Pageable unsortedPageable = PageRequest.of(
+        pageable.getPageNumber(),
+        pageable.getPageSize()
+    );
+    return newsRepository.findByTagName(tagName, unsortedPageable)
+            .map(NewsResponseDto::from);
+}
+```
+
+**교훈**:
+> Native Query에서 ORDER BY를 직접 지정했다면, Service에서 Pageable의 sort를 제거해야 충돌 방지.
 
 ---
 

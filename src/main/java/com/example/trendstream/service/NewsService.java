@@ -5,6 +5,7 @@ import com.example.trendstream.dto.NewsResponseDto;
 import com.example.trendstream.repository.NewsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,17 +67,12 @@ public class NewsService {
     }
 
     /**
-     * 키워드로 뉴스 검색
+     * 키워드로 뉴스 검색 (제목 + 설명 + AI 요약)
      *
      * [검색 범위]
      * - 뉴스 제목 (title)
      * - 뉴스 설명/본문 (description)
-     * - LIKE %keyword% 패턴으로 부분 일치 검색
-     *
-     * [향후 개선 포인트]
-     * - 전문 검색 엔진 도입 (Elasticsearch)
-     * - 형태소 분석을 통한 한국어 검색 최적화
-     * - AI 요약(summary) 필드 검색 추가
+     * - AI 요약 (ai_result.summary)
      *
      * @param keyword 검색 키워드
      * @param pageable 페이지 정보
@@ -84,6 +80,25 @@ public class NewsService {
      */
     public Page<NewsResponseDto> searchNews(String keyword, Pageable pageable) {
         return newsRepository.searchByKeyword(keyword, pageable)
+                .map(NewsResponseDto::from);
+    }
+
+    /**
+     * 태그(키워드)로 뉴스 검색
+     *
+     * [특징]
+     * - AI가 추출한 키워드(태그)로 정확 매칭
+     * - 인덱스 사용 가능 → 빠름
+     * - Native Query에서 ORDER BY 직접 처리 (Pageable sort 제외)
+     *
+     * @param tagName 검색할 태그 이름
+     * @param pageable 페이지 정보
+     * @return 해당 태그가 있는 뉴스 목록
+     */
+    public Page<NewsResponseDto> searchByTag(String tagName, Pageable pageable) {
+        // Native Query에서 ORDER BY 직접 지정하므로 sort 제외
+        Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        return newsRepository.findByTagName(tagName.toLowerCase(), unsortedPageable)
                 .map(NewsResponseDto::from);
     }
 

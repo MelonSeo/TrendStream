@@ -7,9 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -93,7 +91,19 @@ public class GroqService implements AiAnalyzer {
             log.info(">>>> [Groq] 배치 분석 요청: {}개 뉴스, 모델: {}", newsList.size(), model);
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> response = restTemplate.postForObject(API_URL, entity, Map.class);
+            ResponseEntity<Map> responseEntity = restTemplate.exchange(
+                    API_URL, HttpMethod.POST, entity, Map.class);
+
+            // Rate Limit 헤더 로깅
+            HttpHeaders responseHeaders = responseEntity.getHeaders();
+            String remainingRequests = responseHeaders.getFirst("x-ratelimit-remaining-requests");
+            String remainingTokens = responseHeaders.getFirst("x-ratelimit-remaining-tokens");
+            String resetRequests = responseHeaders.getFirst("x-ratelimit-reset-requests");
+            log.info(">>>> [Groq Rate Limit] 남은 요청: {}, 남은 토큰: {}, 리셋까지: {}",
+                    remainingRequests, remainingTokens, resetRequests);
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = responseEntity.getBody();
 
             // 3. 응답 파싱 (OpenAI 형식: choices[0].message.content)
             if (response != null && response.containsKey("choices")) {

@@ -146,4 +146,30 @@ public class NewsController {
             @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(newsService.getPopularNews(pageable));
     }
+
+    /**
+     * 태그(키워드)로 뉴스 검색
+     *
+     * [API 스펙]
+     * - URL: GET /api/news/tag?name={tagName}
+     * - Query Params: name(필수), page, size
+     *
+     * [요청 예시]
+     * - GET /api/news/tag?name=spring        -> "spring" 태그 뉴스
+     * - GET /api/news/tag?name=ai&page=1     -> "ai" 태그 2페이지
+     *
+     * @param name 검색할 태그 이름
+     * @param pageable 페이지 정보
+     * @return 태그 검색 결과 (200 OK)
+     */
+    @Operation(summary = "태그 기반 뉴스 검색", description = "AI가 추출한 키워드(태그)로 뉴스를 검색합니다. 정확한 태그 매칭으로 빠른 검색이 가능합니다.")
+    @GetMapping("/tag")
+    public ResponseEntity<Page<NewsResponseDto>> searchByTag(
+            @Parameter(description = "검색할 태그 이름", required = true, example = "spring")
+            @RequestParam String name,
+            @Parameter(hidden = true)
+            @PageableDefault(size = 10) Pageable pageable) {
+        // Native Query에서 ORDER BY 직접 지정 (pub_date DESC)
+        return ResponseEntity.ok(newsService.searchByTag(name, pageable));
+    }
 }
