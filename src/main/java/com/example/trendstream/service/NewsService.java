@@ -2,8 +2,10 @@ package com.example.trendstream.service;
 
 import com.example.trendstream.domain.entity.News;
 import com.example.trendstream.dto.NewsResponseDto;
+import com.example.trendstream.exception.NewsNotFoundException;
 import com.example.trendstream.repository.NewsRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -39,11 +41,11 @@ public class NewsService {
      *
      * @param id 조회할 뉴스 ID
      * @return 뉴스 상세 정보 DTO
-     * @throws IllegalArgumentException 뉴스가 존재하지 않을 경우
+     * @throws NewsNotFoundException 뉴스가 존재하지 않을 경우 (404 응답으로 변환됨)
      */
     public NewsResponseDto getNewsById(Long id) {
         News news = newsRepository.findByIdWithTags(id)
-                .orElseThrow(() -> new IllegalArgumentException("뉴스를 찾을 수 없습니다. id=" + id));
+                .orElseThrow(() -> new NewsNotFoundException(id));
         return NewsResponseDto.from(news);
     }
 
@@ -145,8 +147,14 @@ public class NewsService {
     /**
      * 사용 가능한 카테고리 목록 조회
      *
+     * [@Cacheable 적용 이유]
+     * - 카테고리 목록은 거의 변경되지 않음 (Producer 추가 시에만 변경)
+     * - 매 요청마다 DISTINCT 쿼리 실행은 비효율적
+     * - TTL 1시간: RedisConfig에서 설정
+     *
      * @return 카테고리 목록 (중복 제거된 검색 키워드)
      */
+    @Cacheable(value = "categories")
     public java.util.List<String> getCategories() {
         return newsRepository.findDistinctSearchKeywords();
     }
@@ -170,8 +178,14 @@ public class NewsService {
     /**
      * 사용 가능한 소스 목록 조회
      *
-     * @return 소스 목록 (Naver API, Hacker News, GeekNews)
+     * [@Cacheable 적용 이유]
+     * - 소스 목록은 거의 변경되지 않음 (Producer 추가 시에만 변경)
+     * - 매 요청마다 DISTINCT 쿼리 실행은 비효율적
+     * - TTL 1시간: RedisConfig에서 설정
+     *
+     * @return 소스 목록 (Naver API, Hacker News, GeekNews 등)
      */
+    @Cacheable(value = "sources")
     public java.util.List<String> getSources() {
         return newsRepository.findDistinctSources();
     }

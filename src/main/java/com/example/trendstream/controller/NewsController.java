@@ -75,7 +75,7 @@ public class NewsController {
      *
      * [요청 예시]
      * - GET /api/news/1     -> ID가 1인 뉴스 조회
-     * - GET /api/news/999   -> 없으면 예외 발생 (추후 ExceptionHandler로 처리)
+     * - GET /api/news/999   -> 없으면 404 Not Found (GlobalExceptionHandler에서 처리)
      *
      * [@PathVariable 역할]
      * - URL 경로의 {id} 부분을 메서드 파라미터로 바인딩

@@ -3,6 +3,7 @@ package com.example.trendstream.service;
 import com.example.trendstream.dto.TrendResponseDto;
 import com.example.trendstream.repository.NewsTagRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,10 +31,20 @@ public class TrendService {
     /**
      * 상위 트렌드 키워드 조회
      *
+     * [@Cacheable 적용 이유]
+     * - 트렌드 집계는 JOIN + GROUP BY + ORDER BY 포함하는 비용이 큰 쿼리
+     * - 동일 period/limit 조합에 대해 5분간 캐싱
+     * - key: "trends::24h_10" 형태로 저장
+     *
+     * [SpEL(Spring Expression Language)]
+     * - #period, #limit: 메서드 파라미터 참조
+     * - 파라미터 조합으로 캐시 키 생성
+     *
      * @param period 기간 ("24h", "7d", "30d")
      * @param limit 상위 N개 키워드
      * @return 트렌드 키워드 + 관련 뉴스 목록
      */
+    @Cacheable(value = "trends", key = "#period + '_' + #limit")
     public List<TrendResponseDto> getTopTrends(String period, int limit) {
         LocalDateTime since = parsePeriod(period);
 
