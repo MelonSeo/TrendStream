@@ -52,6 +52,35 @@ public class News {
     @Column(columnDefinition = "json")
     private AiResponse aiResult;
 
+    // ============================================
+    // Generated Column (가상 컬럼) - 읽기 전용
+    // MySQL에서 자동 계산되므로 JPA에서는 읽기만 함
+    // ============================================
+
+    /**
+     * AI 점수 (Generated Column)
+     * - MySQL: JSON_EXTRACT(ai_result, '$.score')에서 자동 추출
+     * - 용도: findAllByOrderByScoreDesc() 정렬 최적화
+     */
+    @Column(insertable = false, updatable = false)
+    private Integer aiScore;
+
+    /**
+     * 분석 완료 여부 (Generated Column)
+     * - MySQL: ai_result IS NULL이면 0, 아니면 1
+     * - 용도: findByAiResultIsNull() 조회 최적화
+     */
+    @Column(insertable = false, updatable = false)
+    private Boolean isAnalyzed;
+
+    /**
+     * AI 요약 (Generated Column)
+     * - MySQL: ai_result ->> '$.summary'에서 자동 추출
+     * - 용도: findByAiResultFailed() 조회 최적화
+     */
+    @Column(insertable = false, updatable = false)
+    private String aiSummary;
+
     // 양방향 매핑 (NewsTag를 통해 태그 조회)
     @OneToMany(mappedBy = "news", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<NewsTag> newsTags = new ArrayList<>();

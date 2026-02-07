@@ -5,6 +5,7 @@
 ![Kafka](https://img.shields.io/badge/Apache%20Kafka-black?logo=apachekafka)
 ![Redis](https://img.shields.io/badge/Redis-7-red?logo=redis)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-blue?logo=mysql)
+![Docker](https://img.shields.io/badge/Docker-blue?logo=docker)
 
 > IT 뉴스 수집 및 AI 분석 플랫폼
 
@@ -15,27 +16,30 @@
 - **멀티 소스 뉴스 수집**: Kafka 기반 8개 소스 병렬 수집
 - **AI 뉴스 분석**: 요약, 감정 분석, 키워드 추출, 중요도 점수
 - **실시간 트렌드**: 키워드 빈도 기반 트렌드 순위
-- **키워드 구독 알림**: 관심 키워드 등록 시 새 뉴스 알림
+- **키워드 구독 & 이메일 알림**: 관심 키워드 등록 시 Gmail로 새 뉴스 알림
 - **통계 대시보드**: 소스별/시간별/일별 뉴스 통계
+- **데이터 자동 정리**: 60일 이전 뉴스 자동 삭제
 
 ## 기술 스택
 
 ### Backend
 - Java 21, Spring Boot 3.x
-- Spring Data JPA, Spring Kafka
+- Spring Data JPA, Spring Kafka, Spring Mail
 - MySQL 8.0, Redis 7
 
 ### AI 분석
-- Groq API (LLaMA 3.1)
+- Groq API (LLaMA 3.1) - 기본값
 - Google Gemini API
 - Ollama (로컬 LLM)
 
 ### Infrastructure
 - Docker, Docker Compose
 - Apache Kafka, Zookeeper
+- GHCR (GitHub Container Registry)
+- Caddy (리버스 프록시)
 
 ### Frontend
-- (별도 저장소)
+- Next.js (별도 저장소: [TrendStream-Front](https://github.com/MelonSeo/TrendStream-Front))
 
 ## 기술 선택 이유
 
@@ -78,7 +82,7 @@ AiAnalyzer (인터페이스)
 
 ```mermaid
 flowchart TB
-    subgraph Producers["📡 Producers (8개)"]
+    subgraph Producers["Producers (8개)"]
         direction LR
         P1["Naver API<br/>(10분)"]
         P2["Hacker News<br/>(10분)"]
@@ -90,19 +94,21 @@ flowchart TB
         P8["TechCrunch<br/>(20분)"]
     end
 
-    Producers --> Kafka["📨 Apache Kafka<br/>(dev-news topic)"]
+    Producers --> Kafka["Apache Kafka<br/>(dev-news topic)"]
 
     Kafka --> C1["NewsConsumer<br/>(news-group)"]
     Kafka --> C2["StatsConsumer<br/>(stats-group)"]
     Kafka --> C3["NotificationConsumer<br/>(notification-group)"]
 
-    C1 --> DB1[("🗄️ MySQL<br/>news")]
-    C2 --> DB2[("🗄️ MySQL<br/>news_stats")]
-    C3 --> Redis[("⚡ Redis<br/>알림 큐")]
+    C1 --> DB1[("MySQL<br/>news")]
+    C2 --> DB2[("MySQL<br/>news_stats")]
+    C3 --> Redis[("Redis<br/>알림 큐")]
 
-    DB1 --> Scheduler["⏰ NewsAnalysisScheduler<br/>(10초마다)"]
+    Redis --> Email["Gmail SMTP"]
 
-    subgraph AI["🤖 AiAnalyzer"]
+    DB1 --> Scheduler["NewsAnalysisScheduler<br/>(10초마다)"]
+
+    subgraph AI["AiAnalyzer"]
         direction LR
         AI1["GroqService"]
         AI2["GeminiService"]
@@ -140,26 +146,27 @@ flowchart TB
 
 ```env
 # Database
-DB_PASSWORD=
+DB_PASSWORD=your_secure_password
 
 # Naver API
-NAVER_CLIENT_ID=
-NAVER_CLIENT_SECRET=
+NAVER_CLIENT_ID=your_naver_client_id
+NAVER_CLIENT_SECRET=your_naver_client_secret
+NAVER_KEYWORDS=백엔드,AI,클라우드
 
 # AI Provider (groq, gemini, ollama 중 택1)
 AI_PROVIDER=groq
-
-# Groq API (권장)
-GROQ_API_KEY=
-
-# Gemini API (대안)
-GEMINI_API_KEY=
+GROQ_API_KEY=your_groq_api_key
+GEMINI_API_KEY=your_gemini_api_key
 
 # CORS
 CORS_ALLOWED_ORIGINS=http://localhost:3000
+
+# Email (Gmail SMTP)
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your_gmail_app_password
 ```
 
-### 실행
+### 로컬 실행
 
 ```bash
 # 1. 인프라 실행 (MySQL, Kafka, Redis)
@@ -172,6 +179,21 @@ docker-compose up -d
 open http://localhost:8081/swagger-ui.html
 ```
 
+### Docker 배포
+
+```bash
+# 이미지 빌드 (Mac Apple Silicon에서는 --platform 필수)
+docker build --platform linux/amd64 -t ghcr.io/melonseo/trendstream:latest .
+
+# 이미지 푸시
+docker push ghcr.io/melonseo/trendstream:latest
+
+# EC2에서 실행
+docker compose up -d
+```
+
+자세한 배포 가이드는 [DEPLOYMENT.md](./DEPLOYMENT.md)를 참고하세요.
+
 ## API 엔드포인트
 
 ### 뉴스 API
@@ -179,10 +201,13 @@ open http://localhost:8081/swagger-ui.html
 |--------|----------|------|
 | GET | `/api/news` | 뉴스 목록 (페이지네이션) |
 | GET | `/api/news/{id}` | 뉴스 상세 |
-| GET | `/api/news/search?keyword=xxx` | 키워드 검색 |
+| GET | `/api/news/search?keyword=xxx` | 키워드 검색 (제목+설명+AI요약) |
+| GET | `/api/news/tag?name=xxx` | 태그 기반 검색 |
 | GET | `/api/news/popular` | 인기 뉴스 (AI 점수순) |
 | GET | `/api/news/category?name=xxx` | 카테고리별 뉴스 |
+| GET | `/api/news/categories` | 카테고리 목록 |
 | GET | `/api/news/source?name=xxx` | 소스별 뉴스 |
+| GET | `/api/news/sources` | 소스 목록 |
 
 ### 트렌드 API
 | Method | Endpoint | 설명 |
@@ -193,34 +218,35 @@ open http://localhost:8081/swagger-ui.html
 | Method | Endpoint | 설명 |
 |--------|----------|------|
 | GET | `/api/stats/dashboard` | 대시보드 종합 |
-| GET | `/api/stats/sources` | 소스별 통계 |
-| GET | `/api/stats/hourly` | 시간별 통계 |
-| GET | `/api/stats/daily` | 일별 통계 |
+| GET | `/api/stats/sources?days=7` | 소스별 통계 |
+| GET | `/api/stats/hourly?date=xxx` | 시간별 통계 |
+| GET | `/api/stats/daily?days=7` | 일별 통계 |
 
 ### 구독 API
 | Method | Endpoint | 설명 |
 |--------|----------|------|
 | POST | `/api/subscriptions` | 키워드 구독 |
 | GET | `/api/subscriptions?email=xxx` | 내 구독 목록 |
-| DELETE | `/api/subscriptions` | 구독 취소 |
+| DELETE | `/api/subscriptions?email=xxx&keyword=xxx` | 구독 취소 |
+| GET | `/api/subscriptions/keywords` | 활성 키워드 목록 |
 
 ## 프로젝트 구조
 
 ```
 src/main/java/com/example/trendstream/
-├── config/                 # 설정 (Kafka, Redis, AI)
+├── config/                 # 설정 (Kafka, Redis, AI, CORS)
 ├── controller/             # REST API
 ├── domain/
-│   ├── entity/            # JPA 엔티티
-│   ├── enums/             # Enum
-│   └── vo/                # Value Object
+│   ├── entity/            # JPA 엔티티 (News, Tag, User, Subscription 등)
+│   ├── enums/             # Enum (NewsType)
+│   └── vo/                # Value Object (AiResponse)
 ├── dto/                    # DTO
 ├── repository/             # JPA Repository
 ├── service/
 │   ├── ai/                # AI 분석 (Groq, Gemini, Ollama)
 │   ├── consumer/          # Kafka Consumer (3개)
 │   ├── producer/          # Kafka Producer (8개)
-│   └── scheduler/         # 스케줄러
+│   └── scheduler/         # 스케줄러 (AI분석, 데이터정리)
 └── util/                   # 유틸리티 (HtmlUtils, SpamFilter)
 ```
 
@@ -246,22 +272,19 @@ src/main/java/com/example/trendstream/
 }
 ```
 
-## 트러블슈팅
+## 문서
 
-자세한 개발 기록 및 트러블슈팅은 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)를 참고하세요.
+| 문서 | 설명 |
+|-----|------|
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | AWS EC2 배포 가이드 |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | 트러블슈팅 & 개발 기록 |
+| [CLAUDE.md](./CLAUDE.md) | 프로젝트 컨텍스트 (AI 어시스턴트용) |
 
 ## 라이선스
 
-
-
-## 기여자
-
-| 이름 | 역할 | GitHub |
-|-----|------|--------|
-|  |  |  |
+MIT License
 
 ## 관련 링크
 
-- Frontend Repository:
-- 배포 URL:
-- 블로그/회고:
+- **Frontend Repository**: [TrendStream-Front](https://github.com/MelonSeo/TrendStream-Front)
+- **Docker Image**: `ghcr.io/melonseo/trendstream:latest`

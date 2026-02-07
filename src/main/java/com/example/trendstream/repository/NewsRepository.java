@@ -140,54 +140,56 @@ public interface NewsRepository extends JpaRepository<News, Long> {
      *
      * [사용처]
      * - NewsAnalysisScheduler에서 배치 분석할 뉴스 조회
-     * - aiResult가 NULL인 뉴스만 가져옴
+     * - isAnalyzed = false (Generated Column)인 뉴스만 가져옴
+     *
+     * [최적화 (2026-02-08)]
+     * - AS-IS: findByAiResultIsNull() → ai_result IS NULL → Full Table Scan
+     * - TO-BE: findByIsAnalyzedFalse() → is_analyzed = 0 → Index Scan (idx_is_analyzed)
      *
      * @param pageable 페이지 정보 (size로 배치 크기 제어)
      * @return AI 분석이 필요한 뉴스 목록
      */
-    Page<News> findByAiResultIsNull(Pageable pageable);
+    Page<News> findByIsAnalyzedFalse(Pageable pageable);
 
     /**
      * AI 분석 실패 뉴스 조회 (재분석용)
      *
      * [사용처]
      * - NewsAnalysisScheduler에서 분석 실패한 뉴스 재처리
-     * - aiResult의 summary가 '분석 실패'인 뉴스 조회
+     * - aiSummary = '분석 실패' (Generated Column)인 뉴스 조회
      *
-     * [Native Query 사용 이유]
-     * - JSON 내부 필드(summary) 접근 필요 → JSON_EXTRACT 사용
+     * [최적화 (2026-02-08)]
+     * - AS-IS: ai_result ->> '$.summary' = '분석 실패' → JSON 파싱 + Full Scan
+     * - TO-BE: ai_summary = '분석 실패' → Index Scan (idx_ai_summary)
      *
      * @param pageable 페이지 정보 (size로 배치 크기 제어)
      * @return 분석 실패한 뉴스 목록
      */
-    @Query(value = "SELECT * FROM news WHERE ai_result ->> '$.summary' = '분석 실패'",
-            countQuery = "SELECT COUNT(*) FROM news WHERE ai_result ->> '$.summary' = '분석 실패'",
+    @Query(value = "SELECT * FROM news WHERE ai_summary = '분석 실패'",
+            countQuery = "SELECT COUNT(*) FROM news WHERE ai_summary = '분석 실패'",
             nativeQuery = true)
     Page<News> findByAiResultFailed(Pageable pageable);
 
     /**
-     * AI 중요도 점수순 정렬 (Native Query)
+     * AI 중요도 점수순 정렬 (Generated Column 활용)
      *
-     * [Native Query 사용 이유]
-     * - JPQL은 JSON 필드 내부 값 접근을 지원하지 않음
-     * - MySQL의 JSON_EXTRACT() 함수로 aiResult JSON에서 score 추출
+     * [최적화 (2026-02-08)]
+     * - AS-IS: ORDER BY JSON_EXTRACT(ai_result, '$.score') → 매번 JSON 파싱 + filesort
+     * - TO-BE: ORDER BY ai_score → Index Scan (idx_ai_score)
      *
-     * [JSON_EXTRACT 문법]
-     * - JSON_EXTRACT(column, '$.key'): JSON에서 특정 키의 값 추출
-     * - aiResult가 {"score": 85}면 → 85 반환
-     *
-     * [countQuery 필요 이유]
-     * - 페이지네이션 시 전체 개수 조회용 쿼리 필요
-     * - Native Query는 자동 생성 안 되므로 직접 지정
+     * [Generated Column 장점]
+     * - JSON 파싱 오버헤드 제거
+     * - 인덱스가 이미 정렬된 상태 → filesort 불필요
+     * - O(n log n) → O(log n)
      *
      * [WHERE 조건]
-     * - aiResult가 NULL인 뉴스는 제외 (AI 분석 안 된 뉴스)
+     * - ai_score IS NOT NULL: AI 분석 안 된 뉴스 제외
      *
      * @param pageable 페이지 정보
      * @return 중요도 점수 내림차순 정렬된 뉴스 목록
      */
-    @Query(value = "SELECT * FROM news WHERE ai_result IS NOT NULL ORDER BY JSON_EXTRACT(ai_result, '$.score') DESC",
-            countQuery = "SELECT COUNT(*) FROM news WHERE ai_result IS NOT NULL",
+    @Query(value = "SELECT * FROM news WHERE ai_score IS NOT NULL ORDER BY ai_score DESC",
+            countQuery = "SELECT COUNT(*) FROM news WHERE ai_score IS NOT NULL",
             nativeQuery = true)
     Page<News> findAllByOrderByScoreDesc(Pageable pageable);
 
