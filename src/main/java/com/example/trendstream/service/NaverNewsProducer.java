@@ -115,6 +115,7 @@ public class NaverNewsProducer {
                             .source("Naver API")
                             .type(NewsType.NEWS)
                             .pubDateStr(item.getPubDate())
+                            .searchKeyword(keyword)
                             .build();
 
                     kafkaTemplate.send("dev-news", message);

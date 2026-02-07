@@ -172,4 +172,50 @@ public class NewsController {
         // Native Query에서 ORDER BY 직접 지정 (pub_date DESC)
         return ResponseEntity.ok(newsService.searchByTag(name, pageable));
     }
+
+    /**
+     * 카테고리별 뉴스 조회
+     *
+     * [API 스펙]
+     * - URL: GET /api/news/category?name={categoryName}
+     * - Query Params: name(필수), page, size
+     *
+     * [카테고리란?]
+     * - Naver API 검색 시 사용된 키워드 (백엔드, AI, 클라우드 등)
+     * - searchKeyword 필드에 저장됨
+     *
+     * [요청 예시]
+     * - GET /api/news/category?name=AI             -> "AI" 카테고리 뉴스
+     * - GET /api/news/category?name=백엔드&page=1   -> "백엔드" 카테고리 2페이지
+     *
+     * @param name 카테고리명 (검색 키워드)
+     * @param pageable 페이지 정보
+     * @return 해당 카테고리의 뉴스 목록 (200 OK)
+     */
+    @Operation(summary = "카테고리별 뉴스 조회", description = "Naver API 검색 키워드(카테고리)별로 뉴스를 조회합니다.")
+    @GetMapping("/category")
+    public ResponseEntity<Page<NewsResponseDto>> getNewsByCategory(
+            @Parameter(description = "카테고리명 (검색 키워드)", required = true, example = "AI")
+            @RequestParam String name,
+            @Parameter(hidden = true)
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(newsService.getNewsByCategory(name, pageable));
+    }
+
+    /**
+     * 사용 가능한 카테고리 목록 조회
+     *
+     * [API 스펙]
+     * - URL: GET /api/news/categories
+     *
+     * [응답 예시]
+     * - ["AI", "백엔드", "클라우드", "자바", "여기어때"]
+     *
+     * @return 카테고리 목록 (200 OK)
+     */
+    @Operation(summary = "카테고리 목록 조회", description = "사용 가능한 모든 카테고리(검색 키워드) 목록을 조회합니다.")
+    @GetMapping("/categories")
+    public ResponseEntity<java.util.List<String>> getCategories() {
+        return ResponseEntity.ok(newsService.getCategories());
+    }
 }

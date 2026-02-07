@@ -121,4 +121,31 @@ public class NewsService {
         return newsRepository.findAllByOrderByScoreDesc(pageable)
                 .map(NewsResponseDto::from);
     }
+
+    /**
+     * 카테고리(검색 키워드)별 뉴스 조회
+     *
+     * [특징]
+     * - Naver API 검색 시 사용된 키워드로 그룹화
+     * - 예: "백엔드", "AI", "클라우드" 등
+     *
+     * @param category 카테고리명 (검색 키워드)
+     * @param pageable 페이지 정보
+     * @return 해당 카테고리의 뉴스 목록
+     */
+    public Page<NewsResponseDto> getNewsByCategory(String category, Pageable pageable) {
+        // Native Query에서 ORDER BY 직접 지정하므로 sort 제외
+        Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        return newsRepository.findBySearchKeyword(category, unsortedPageable)
+                .map(NewsResponseDto::from);
+    }
+
+    /**
+     * 사용 가능한 카테고리 목록 조회
+     *
+     * @return 카테고리 목록 (중복 제거된 검색 키워드)
+     */
+    public java.util.List<String> getCategories() {
+        return newsRepository.findDistinctSearchKeywords();
+    }
 }

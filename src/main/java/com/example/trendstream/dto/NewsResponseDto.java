@@ -64,6 +64,7 @@ public class NewsResponseDto {
                 .pubDate(news.getPubDate())
                 .aiResult(news.getAiResult())
                 .tags(tagNames)
+                .searchKeyword(news.getSearchKeyword())
                 .build();
     }
 }

@@ -74,6 +74,7 @@ public class NewsConsumer {
                 .type(NewsType.NEWS)
                 .pubDate(publishedAt)
                 .aiResult(null)  // AI 분석은 스케줄러가 배치로 처리
+                .searchKeyword(message.getSearchKeyword())
                 .build();
 
         newsRepository.save(news);

@@ -428,6 +428,7 @@ LIMIT :limit
 | 2026-02-06 | Ollama 로컬 LLM 하이브리드 도입 | AiAnalyzer 인터페이스 + Strategy 패턴으로 ollama/gemini 전환 |
 | 2026-02-07 | application.properties 한글 인코딩 깨짐 | 유니코드 이스케이프 변환 (`\uXXXX`) |
 | 2026-02-07 | Native Query + Pageable sort 충돌 | PageRequest.of()로 sort 제외한 Pageable 생성 |
+| 2026-02-07 | 카테고리별 뉴스 조회 기능 추가 | searchKeyword 필드 + API 엔드포인트 + 프론트엔드 페이지 |
 
 ---
 
@@ -579,6 +580,45 @@ public Page<NewsResponseDto> searchByTag(String tagName, Pageable pageable) {
 
 **교훈**:
 > Native Query에서 ORDER BY를 직접 지정했다면, Service에서 Pageable의 sort를 제거해야 충돌 방지.
+
+---
+
+### 8. 카테고리(검색 키워드)별 뉴스 조회 기능
+
+**배경**: Naver API 검색 시 사용하는 키워드(백엔드, AI, 클라우드 등)별로 뉴스를 그룹화하여 조회하는 기능 필요
+
+**구현 내용**:
+
+#### 백엔드 변경
+
+| 파일 | 액션 | 설명 |
+|-----|------|------|
+| `domain/entity/News.java` | 수정 | `searchKeyword` 필드 추가, 인덱스 추가 (`idx_search_keyword`) |
+| `dto/NewsMessage.java` | 수정 | `searchKeyword` 필드 추가 (Kafka 메시지) |
+| `dto/NewsResponseDto.java` | 수정 | `searchKeyword` 필드 추가, `from()` 메서드 수정 |
+| `service/NaverNewsProducer.java` | 수정 | NewsMessage에 검색 키워드 포함하여 전송 |
+| `service/NewsConsumer.java` | 수정 | News 엔티티에 searchKeyword 저장 |
+| `repository/NewsRepository.java` | 수정 | `findBySearchKeyword()`, `findDistinctSearchKeywords()` 추가 |
+| `service/NewsService.java` | 수정 | `getNewsByCategory()`, `getCategories()` 추가 |
+| `controller/NewsController.java` | 수정 | `GET /api/news/category`, `GET /api/news/categories` 추가 |
+
+#### 프론트엔드 변경
+
+| 파일 | 액션 | 설명 |
+|-----|------|------|
+| `app/api.ts` | 수정 | `getNewsByCategory()`, `getCategories()` 함수 추가 |
+| `app/news/category/page.tsx` | 신규 | 카테고리 페이지 (카테고리 칩 버튼 + 뉴스 목록) |
+| `app/layout.tsx` | 수정 | 네비게이션 + 푸터에 Category 링크 추가 |
+
+#### API 스펙
+
+| 엔드포인트 | 설명 |
+|-----------|------|
+| `GET /api/news/category?name=AI` | AI 카테고리의 뉴스 목록 조회 |
+| `GET /api/news/categories` | 사용 가능한 카테고리 목록 반환 `["AI", "백엔드", "클라우드", ...]` |
+
+**주의사항**:
+> 기존에 수집된 뉴스에는 `searchKeyword`가 null이므로, 카테고리 조회 시 표시되지 않음. 새로 수집되는 뉴스부터 카테고리 분류됨.
 
 ---
 

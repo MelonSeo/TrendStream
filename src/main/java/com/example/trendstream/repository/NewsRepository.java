@@ -212,4 +212,31 @@ public interface NewsRepository extends JpaRepository<News, Long> {
                     "WHERE t.name = :tagName",
             nativeQuery = true)
     Page<News> findByTagName(@Param("tagName") String tagName, Pageable pageable);
+
+    /**
+     * 카테고리(검색 키워드)별 뉴스 조회
+     *
+     * [사용처]
+     * - 특정 카테고리의 뉴스 목록 조회 (GET /api/news/category?name=백엔드)
+     *
+     * @param searchKeyword 검색 키워드 (카테고리)
+     * @param pageable 페이지 정보
+     * @return 해당 카테고리의 뉴스 목록
+     */
+    @Query(value = "SELECT * FROM news WHERE search_keyword = :searchKeyword ORDER BY pub_date DESC",
+            countQuery = "SELECT COUNT(*) FROM news WHERE search_keyword = :searchKeyword",
+            nativeQuery = true)
+    Page<News> findBySearchKeyword(@Param("searchKeyword") String searchKeyword, Pageable pageable);
+
+    /**
+     * 사용 가능한 카테고리(검색 키워드) 목록 조회
+     *
+     * [사용처]
+     * - 카테고리 목록 API (GET /api/news/categories)
+     *
+     * @return 중복 제거된 검색 키워드 목록
+     */
+    @Query(value = "SELECT DISTINCT search_keyword FROM news WHERE search_keyword IS NOT NULL ORDER BY search_keyword",
+            nativeQuery = true)
+    List<String> findDistinctSearchKeywords();
 }
