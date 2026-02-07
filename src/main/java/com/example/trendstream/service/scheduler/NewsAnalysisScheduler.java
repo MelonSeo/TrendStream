@@ -54,8 +54,8 @@ public class NewsAnalysisScheduler {
     @Scheduled(fixedDelayString = "${ai.analysis.interval:10000}")
     @Transactional
     public void analyzeUnprocessedNews() {
-        // 1. 미분석 뉴스 우선 조회
-        List<News> targetNews = newsRepository.findByAiResultIsNull(
+        // 1. 미분석 뉴스 우선 조회 (is_analyzed = 0, Generated Column + Index 활용)
+        List<News> targetNews = newsRepository.findByIsAnalyzedFalse(
                 PageRequest.of(0, BATCH_SIZE)).getContent();
 
         // 2. 미분석 뉴스 없으면 → 분석 실패 뉴스 조회 (재분석)
