@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -263,4 +264,24 @@ public interface NewsRepository extends JpaRepository<News, Long> {
     @Query(value = "SELECT DISTINCT source FROM news ORDER BY source",
             nativeQuery = true)
     List<String> findDistinctSources();
+
+    /**
+     * 지정된 날짜 이전의 뉴스 삭제 (데이터 정리용)
+     *
+     * [사용처]
+     * - DataCleanupScheduler에서 오래된 뉴스 정리
+     * - cascade = CascadeType.ALL 설정으로 연관된 NewsTag도 함께 삭제됨
+     *
+     * @param before 이 날짜 이전의 뉴스 삭제
+     * @return 삭제된 뉴스 개수
+     */
+    long deleteByPubDateBefore(LocalDateTime before);
+
+    /**
+     * 지정된 날짜 이전의 뉴스 개수 조회 (삭제 전 확인용)
+     *
+     * @param before 이 날짜 이전의 뉴스 개수
+     * @return 해당 뉴스 개수
+     */
+    long countByPubDateBefore(LocalDateTime before);
 }

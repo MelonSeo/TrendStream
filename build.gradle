@@ -40,6 +40,12 @@ dependencies {
 	// 4. Redis (알림 큐, 캐싱)
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
+	// 5. Mail (이메일 발송)
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+	// 6. Actuator (헬스체크)
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
 	// 4. 유틸리티 (RSS, Swagger, JSON)
 	// RSS 파싱 (Rome 라이브러리)
 	implementation 'com.rometools:rome:1.18.0'
