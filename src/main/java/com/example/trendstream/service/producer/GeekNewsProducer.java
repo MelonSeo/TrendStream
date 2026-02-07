@@ -56,7 +56,7 @@ public class GeekNewsProducer {
     /**
      * 10분마다 GeekNews RSS 수집
      */
-    @Scheduled(fixedDelay = 600000) // 10분
+    @Scheduled(initialDelay = 60000, fixedDelay = 600000) // 앱 시작 60초 후 첫 실행, 이후 10분마다
     public void crawlGeekNews() {
         log.info(">>>> [GeekNewsProducer] GeekNews 수집 시작...");
 

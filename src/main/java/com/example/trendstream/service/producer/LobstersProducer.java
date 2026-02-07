@@ -51,7 +51,7 @@ public class LobstersProducer {
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH);
 
-    @Scheduled(fixedRate = 900000) // 15분마다
+    @Scheduled(initialDelay = 60000, fixedRate = 900000) // 앱 시작 60초 후 첫 실행, 이후 15분마다
     public void fetchLobstersNews() {
         log.info(">>>> [Lobsters] RSS 뉴스 수집 시작");
 

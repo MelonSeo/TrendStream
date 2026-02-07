@@ -54,7 +54,7 @@ public class HackerNewsProducer {
     /**
      * 10분마다 Hacker News 최신 스토리 수집
      */
-    @Scheduled(fixedDelay = 600000) // 10분
+    @Scheduled(initialDelay = 60000, fixedDelay = 600000) // 앱 시작 60초 후 첫 실행, 이후 10분마다
     public void crawlHackerNews() {
         log.info(">>>> [HackerNewsProducer] Hacker News 수집 시작...");
 

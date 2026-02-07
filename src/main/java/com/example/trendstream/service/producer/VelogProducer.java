@@ -52,7 +52,7 @@ public class VelogProducer {
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH);
 
-    @Scheduled(fixedRate = 600000) // 10분마다
+    @Scheduled(initialDelay = 60000, fixedRate = 600000) // 앱 시작 60초 후 첫 실행, 이후 10분마다
     public void fetchVelogNews() {
         log.info(">>>> [Velog] RSS 뉴스 수집 시작");
 

@@ -47,8 +47,8 @@ public class NaverNewsProducer {
     // 🔥 [중복 방지용 캐시] 이미 보낸 링크는 기억해둡니다.
     private final Set<String> sentLinkCache = Collections.synchronizedSet(new HashSet<>());
 
-    // 10분마다 실행
-    @Scheduled(fixedDelay = 600000)
+    // 앱 시작 60초 후 첫 실행, 이후 10분마다 실행 (Consumer 조인 시간 확보)
+    @Scheduled(initialDelay = 60000, fixedDelay = 600000)
     public void crawlNaverNews() {
         log.info(">>>> [NaverNewsProducer] 전체 키워드에 대한 뉴스 수집을 시작합니다...");
         for (String keyword : keywords) {

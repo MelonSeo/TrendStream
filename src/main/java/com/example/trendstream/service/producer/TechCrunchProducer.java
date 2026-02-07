@@ -51,7 +51,7 @@ public class TechCrunchProducer {
     private static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH);
 
-    @Scheduled(fixedRate = 1200000) // 20분마다
+    @Scheduled(initialDelay = 60000, fixedRate = 1200000) // 앱 시작 60초 후 첫 실행, 이후 20분마다
     public void fetchTechCrunchNews() {
         log.info(">>>> [TechCrunch] RSS 뉴스 수집 시작");
 
