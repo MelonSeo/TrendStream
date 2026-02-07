@@ -1,9 +1,8 @@
-package com.example.trendstream.service;
+package com.example.trendstream.service.consumer;
 
 import com.example.trendstream.domain.entity.News;
 import com.example.trendstream.domain.enums.NewsType;
 import com.example.trendstream.repository.NewsRepository;
-import com.example.trendstream.domain.vo.AiResponse;
 import com.example.trendstream.dto.NewsMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,18 +14,37 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
+/**
+ * Kafka 뉴스 메시지 소비자
+ *
+ * [역할 변경 - 배치 처리 도입]
+ * - AS-IS: 메시지 수신 → AI 분석 → DB 저장
+ * - TO-BE: 메시지 수신 → DB 저장만 (AI 분석은 스케줄러가 배치로 처리)
+ *
+ * [AI 분석 분리 이유]
+ * - API 호출 최적화: 5개씩 묶어서 1회 호출 (80% 절약)
+ * - 무료 한도 효율적 사용
+ * - 분석 실패해도 뉴스 데이터는 보존
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NewsConsumer {
 
-    private final GeminiService geminiService;
     private final NewsRepository newsRepository;
 
     private static final DateTimeFormatter NAVER_DATE_FORMAT =
             DateTimeFormatter.ofPattern("EEE, d MMM yyyy HH:mm:ss Z", Locale.ENGLISH);
 
-    // Kafka에서 'dev-news' 토픽을 감시하다가 메시지가 오면 이 메서드가 실행됨
+    /**
+     * Kafka 메시지 소비 - DB 저장만 담당
+     *
+     * [처리 흐름]
+     * 1. 중복 체크 (link 기준)
+     * 2. 날짜 파싱
+     * 3. DB 저장 (aiResult = null)
+     * 4. AI 분석은 NewsAnalysisScheduler가 별도로 처리
+     */
     @KafkaListener(topics = "dev-news", groupId = "news-group")
     @Transactional
     public void consumeNews(NewsMessage message) {
@@ -38,32 +56,28 @@ public class NewsConsumer {
             return;
         }
 
+        // 2. 날짜 파싱
         LocalDateTime publishedAt;
         try {
-            // NewsMessage의 pubDate(String)를 꺼내서 LocalDateTime으로 변환
             publishedAt = LocalDateTime.parse(message.getPubDateStr(), NAVER_DATE_FORMAT);
         } catch (Exception e) {
             log.warn("날짜 파싱 실패, 현재 시간으로 대체: {}", message.getPubDateStr());
             publishedAt = LocalDateTime.now();
         }
 
-        // 2. Gemini에게 분석 요청 (AI야, 이거 읽고 요약해줘!)
-        AiResponse aiResult = geminiService.analyzeNews(message.getTitle(), message.getDescription());
-        log.info(">>>> [AI 분석 완료] 점수: {}점, 감정: {}", aiResult.getScore(), aiResult.getSentiment());
-
-        // 3. DB에 저장할 엔티티(News)로 변환
+        // 3. DB에 저장 (AI 분석 없이, aiResult = null)
         News news = News.builder()
                 .title(message.getTitle())
                 .link(message.getLink())
                 .description(message.getDescription())
-                .source("Naver Open API")
-                .type(NewsType.NEWS) // ✅ Enum 설정 (이게 없으면 에러 납니다!)
+                .source(message.getSource())  // Producer가 보낸 소스 사용
+                .type(message.getType())      // Producer가 보낸 타입 사용
                 .pubDate(publishedAt)
-                .aiResult(aiResult)  // ✅ 이제 여기서 에러 안 남!
+                .aiResult(null)  // AI 분석은 스케줄러가 배치로 처리
+                .searchKeyword(message.getSearchKeyword())
                 .build();
 
-        // 4. 저장
         newsRepository.save(news);
-        log.info(">>>> [DB 저장 완료] ID: {}", news.getId());
+        log.info(">>>> [DB 저장 완료] ID: {} (AI 분석 대기중)", news.getId());
     }
 }
