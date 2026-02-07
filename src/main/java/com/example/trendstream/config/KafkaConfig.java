@@ -46,8 +46,8 @@ public class KafkaConfig {
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "news-group");
 
-        // Consumer는 DB 저장만 담당 → 빠르게 소비 (Rate Limit은 Scheduler가 관리)
-        config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10);
+        // Consumer는 DB 저장만 담당 → 빠르게 소비 (AI 분석은 Scheduler가 배치 처리)
+        config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 100); // 한 번에 100개까지 가져옴
 
         // JSON을 자바 객체(NewsMessage)로 다시 변환하는 설정
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
@@ -59,15 +59,18 @@ public class KafkaConfig {
     }
 
     // ======================================================
-    // 3. Listener 공장 (속도 조절 장치)
+    // 3. Listener 공장 (병렬 처리 설정)
     // ======================================================
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
 
-        // DB 저장만 하므로 긴 대기 불필요, 방어적으로 1초 간격 유지 (AI Rate Limit은 Scheduler에서 제어)
-        factory.getContainerProperties().setIdleBetweenPolls(1000);
+        // 병렬 Consumer 스레드 수 (파티션 수와 맞추면 최적)
+        factory.setConcurrency(3);
+
+        // DB 저장만 하므로 대기 시간 최소화
+        factory.getContainerProperties().setIdleBetweenPolls(100);
 
         return factory;
     }

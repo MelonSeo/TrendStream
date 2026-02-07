@@ -37,6 +37,9 @@ dependencies {
 	// 3. Apache Kafka (메시지 큐)
 	implementation 'org.springframework.kafka:spring-kafka'
 
+	// 4. Redis (알림 큐, 캐싱)
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
 	// 4. 유틸리티 (RSS, Swagger, JSON)
 	// RSS 파싱 (Rome 라이브러리)
 	implementation 'com.rometools:rome:1.18.0'

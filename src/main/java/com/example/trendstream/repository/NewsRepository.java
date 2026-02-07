@@ -239,4 +239,28 @@ public interface NewsRepository extends JpaRepository<News, Long> {
     @Query(value = "SELECT DISTINCT search_keyword FROM news WHERE search_keyword IS NOT NULL ORDER BY search_keyword",
             nativeQuery = true)
     List<String> findDistinctSearchKeywords();
+
+    /**
+     * 소스별 뉴스 조회
+     *
+     * [사용처]
+     * - 소스별 뉴스 목록 API (GET /api/news/source?name=Hacker News)
+     *
+     * @param source 출처 (Naver API, Hacker News, GeekNews)
+     * @param pageable 페이지 정보
+     * @return 해당 소스의 뉴스 목록
+     */
+    @Query(value = "SELECT * FROM news WHERE source = :source ORDER BY pub_date DESC",
+            countQuery = "SELECT COUNT(*) FROM news WHERE source = :source",
+            nativeQuery = true)
+    Page<News> findBySource(@Param("source") String source, Pageable pageable);
+
+    /**
+     * 사용 가능한 소스 목록 조회
+     *
+     * @return 중복 제거된 소스 목록
+     */
+    @Query(value = "SELECT DISTINCT source FROM news ORDER BY source",
+            nativeQuery = true)
+    List<String> findDistinctSources();
 }

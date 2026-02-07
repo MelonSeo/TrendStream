@@ -1,9 +1,9 @@
 package com.example.trendstream.config;
 
-import com.example.trendstream.service.AiAnalyzer;
-import com.example.trendstream.service.GeminiService;
-import com.example.trendstream.service.GroqService;
-import com.example.trendstream.service.OllamaService;
+import com.example.trendstream.service.ai.AiAnalyzer;
+import com.example.trendstream.service.ai.GeminiService;
+import com.example.trendstream.service.ai.GroqService;
+import com.example.trendstream.service.ai.OllamaService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

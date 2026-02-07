@@ -1,10 +1,11 @@
-package com.example.trendstream.service;
+package com.example.trendstream.service.scheduler;
 
 import com.example.trendstream.domain.entity.News;
 import com.example.trendstream.domain.entity.NewsTag;
 import com.example.trendstream.domain.entity.Tag;
 import com.example.trendstream.domain.vo.AiResponse;
 import com.example.trendstream.repository.NewsRepository;
+import com.example.trendstream.service.ai.AiAnalyzer;
 import com.example.trendstream.repository.NewsTagRepository;
 import com.example.trendstream.repository.TagRepository;
 import lombok.RequiredArgsConstructor;

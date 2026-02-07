@@ -1,4 +1,4 @@
-package com.example.trendstream.service;
+package com.example.trendstream.service.ai;
 
 import com.example.trendstream.domain.entity.News;
 import com.example.trendstream.domain.vo.AiResponse;

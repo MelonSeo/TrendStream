@@ -117,7 +117,7 @@ public class NewsController {
             @Parameter(description = "검색할 키워드", required = true, example = "AI")
             @RequestParam String keyword,
             @Parameter(hidden = true)
-            @PageableDefault(size = 10, sort = "pubDate", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(newsService.searchNews(keyword, pageable));
     }
 
@@ -217,5 +217,48 @@ public class NewsController {
     @GetMapping("/categories")
     public ResponseEntity<java.util.List<String>> getCategories() {
         return ResponseEntity.ok(newsService.getCategories());
+    }
+
+    /**
+     * 소스별 뉴스 조회
+     *
+     * [API 스펙]
+     * - URL: GET /api/news/source?name={sourceName}
+     * - Query Params: name(필수), page, size
+     *
+     * [소스 종류]
+     * - "Naver API": 네이버 뉴스
+     * - "Hacker News": 해커 뉴스
+     * - "GeekNews": 긱뉴스
+     *
+     * @param name 소스명
+     * @param pageable 페이지 정보
+     * @return 해당 소스의 뉴스 목록 (200 OK)
+     */
+    @Operation(summary = "소스별 뉴스 조회", description = "뉴스 출처(Naver, Hacker News, GeekNews)별로 뉴스를 조회합니다.")
+    @GetMapping("/source")
+    public ResponseEntity<Page<NewsResponseDto>> getNewsBySource(
+            @Parameter(description = "소스명", required = true, example = "Hacker News")
+            @RequestParam String name,
+            @Parameter(hidden = true)
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(newsService.getNewsBySource(name, pageable));
+    }
+
+    /**
+     * 사용 가능한 소스 목록 조회
+     *
+     * [API 스펙]
+     * - URL: GET /api/news/sources
+     *
+     * [응답 예시]
+     * - ["GeekNews", "Hacker News", "Naver API"]
+     *
+     * @return 소스 목록 (200 OK)
+     */
+    @Operation(summary = "소스 목록 조회", description = "사용 가능한 모든 뉴스 소스 목록을 조회합니다.")
+    @GetMapping("/sources")
+    public ResponseEntity<java.util.List<String>> getSources() {
+        return ResponseEntity.ok(newsService.getSources());
     }
 }

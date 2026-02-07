@@ -1,4 +1,4 @@
-package com.example.trendstream.service;
+package com.example.trendstream.service.producer;
 
 import com.example.trendstream.domain.enums.NewsType;
 import com.example.trendstream.dto.NaverApiDto;
@@ -17,6 +17,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 
+import com.example.trendstream.util.HtmlUtils;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -46,25 +47,14 @@ public class NaverNewsProducer {
     // 🔥 [중복 방지용 캐시] 이미 보낸 링크는 기억해둡니다.
     private final Set<String> sentLinkCache = Collections.synchronizedSet(new HashSet<>());
 
-    // 5분마다 실행
-    @Scheduled(fixedDelay = 300000)
+    // 10분마다 실행
+    @Scheduled(fixedDelay = 600000)
     public void crawlNaverNews() {
         log.info(">>>> [NaverNewsProducer] 전체 키워드에 대한 뉴스 수집을 시작합니다...");
         for (String keyword : keywords) {
             crawlAndSendNewsForKeyword(keyword);
         }
         log.info(">>>> [NaverNewsProducer] 전체 뉴스 수집을 완료했습니다.");
-    }
-
-    private String decodeHtml(String text) {
-        if (text == null) return null;
-        return text
-                .replace("&quot;", "\"")
-                .replace("&amp;", "&")
-                .replace("&lt;", "<")
-                .replace("&gt;", ">")
-                .replace("&apos;", "'")
-                .replace("&#39;", "'");
     }
 
     private void crawlAndSendNewsForKeyword(String keyword) {
@@ -105,8 +95,8 @@ public class NaverNewsProducer {
                         continue;
                     }
 
-                    String cleanTitle = decodeHtml(item.getTitle().replaceAll("<[^>]*>", ""));
-                    String cleanDesc = decodeHtml(item.getDescription().replaceAll("<[^>]*>", ""));
+                    String cleanTitle = HtmlUtils.clean(item.getTitle());
+                    String cleanDesc = HtmlUtils.clean(item.getDescription());
 
                     NewsMessage message = NewsMessage.builder()
                             .title(cleanTitle)

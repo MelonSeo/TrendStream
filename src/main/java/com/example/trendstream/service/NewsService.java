@@ -79,7 +79,9 @@ public class NewsService {
      * @return 검색 결과 (페이지네이션)
      */
     public Page<NewsResponseDto> searchNews(String keyword, Pageable pageable) {
-        return newsRepository.searchByKeyword(keyword, pageable)
+        // Native Query에서 ORDER BY 직접 지정하므로 sort 제외
+        Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        return newsRepository.searchByKeyword(keyword, unsortedPageable)
                 .map(NewsResponseDto::from);
     }
 
@@ -147,5 +149,30 @@ public class NewsService {
      */
     public java.util.List<String> getCategories() {
         return newsRepository.findDistinctSearchKeywords();
+    }
+
+    /**
+     * 소스별 뉴스 조회
+     *
+     * [특징]
+     * - 뉴스 출처로 그룹화 (Naver API, Hacker News, GeekNews)
+     *
+     * @param source 소스명
+     * @param pageable 페이지 정보
+     * @return 해당 소스의 뉴스 목록
+     */
+    public Page<NewsResponseDto> getNewsBySource(String source, Pageable pageable) {
+        Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        return newsRepository.findBySource(source, unsortedPageable)
+                .map(NewsResponseDto::from);
+    }
+
+    /**
+     * 사용 가능한 소스 목록 조회
+     *
+     * @return 소스 목록 (Naver API, Hacker News, GeekNews)
+     */
+    public java.util.List<String> getSources() {
+        return newsRepository.findDistinctSources();
     }
 }

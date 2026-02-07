@@ -1,4 +1,4 @@
-package com.example.trendstream.service;
+package com.example.trendstream.service.ai;
 
 import com.example.trendstream.domain.entity.News;
 import com.example.trendstream.domain.vo.AiResponse;
@@ -115,10 +115,8 @@ public class GroqService implements AiAnalyzer {
                     Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
                     String content = (String) message.get("content");
 
-                    String jsonText = content
-                            .replace("```json", "")
-                            .replace("```", "")
-                            .trim();
+                    // JSON 배열 추출 (앞뒤 텍스트 제거)
+                    String jsonText = extractJsonArray(content);
 
                     List<AiResponse> results = objectMapper.readValue(
                             jsonText, new TypeReference<List<AiResponse>>() {});
@@ -138,5 +136,28 @@ public class GroqService implements AiAnalyzer {
             fallback.add(new AiResponse("분석 실패", "NEUTRAL", null, 0));
         }
         return fallback;
+    }
+
+    /**
+     * 응답에서 JSON 배열만 추출
+     * AI가 "뉴스 분석 결과:" 같은 텍스트를 앞에 붙이는 경우 처리
+     */
+    private String extractJsonArray(String content) {
+        // 코드 블록 제거
+        String cleaned = content
+                .replace("```json", "")
+                .replace("```", "")
+                .trim();
+
+        // [ 로 시작하는 JSON 배열 찾기
+        int startIndex = cleaned.indexOf('[');
+        int endIndex = cleaned.lastIndexOf(']');
+
+        if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
+            return cleaned.substring(startIndex, endIndex + 1);
+        }
+
+        // 못 찾으면 원본 반환 (파싱 에러로 처리되도록)
+        return cleaned;
     }
 }
