@@ -4,7 +4,7 @@
 - Java 21, Spring Boot 3.x, Gradle
 - MySQL 8.0 (Port 3307), JPA (Hibernate 6)
 - Kafka, Zookeeper, Kafka UI
-- Google Gemini API (`gemini-2.5-flash`)
+- AI 분석: Groq (`llama-3.1-8b-instant`) / Gemini (`gemini-2.5-flash`) / Ollama (로컬, GPU 필요)
 - Swagger (SpringDoc OpenAPI)
 - Library: `io.hypersistence:hypersistence-utils-hibernate-63`
 
@@ -37,13 +37,16 @@
 - **스케줄러**: `NewsAnalysisScheduler`가 30초마다 실행
 - **Rate Limit 관리**: 스케줄러가 단독으로 담당 (KafkaConfig에서는 제어하지 않음)
 - **처리 흐름**: Consumer → DB 저장 (aiResult=null) → 스케줄러 → 배치 분석 → 업데이트
+- **AI Provider 전환**: `ai.provider` 프로퍼티로 groq/gemini/ollama 전환 (기본값: groq)
+- **인터페이스**: `AiAnalyzer` — `GroqService`, `GeminiService`, `OllamaService`가 구현
+- **빈 선택**: `AiConfig`에서 `ai.provider` 값에 따라 구현체 결정
 
 ### 2.6 Architecture Flow
 ```
 [Step 1] NaverNewsProducer → Kafka (topic: dev-news)
 [Step 2] NewsConsumer → 중복 체크 → DB 저장 (aiResult = null)
 [Step 3] NewsAnalysisScheduler → 3개씩 배치 조회
-[Step 4] GeminiService.analyzeBatchNews() → 배치 AI 분석
+[Step 4] AiAnalyzer.analyzeBatchNews() → 배치 AI 분석 (Ollama 또는 Gemini)
 [Step 5] 분석 결과 DB 업데이트 + keywords → Tag/NewsTag 저장
 [Step 6] NewsController → REST API로 데이터 제공
 [Step 7] TrendController → 키워드 빈도 집계 → 트렌드 순위 API
@@ -54,6 +57,7 @@
 src/main/java/com/example/trendstream/
 ├── TrendStreamApplication.java
 ├── config/
+│   ├── AiConfig.java                   # AI provider 빈 선택 (ollama/gemini)
 │   └── KafkaConfig.java
 ├── controller/
 │   ├── NewsController.java
@@ -78,10 +82,13 @@ src/main/java/com/example/trendstream/
 │   ├── NewsTagRepository.java
 │   └── TagRepository.java
 └── service/
-    ├── GeminiService.java              # analyzeBatchNews() 배치 분석
+    ├── AiAnalyzer.java                 # AI 분석 공통 인터페이스
+    ├── GroqService.java                # Groq 클라우드 LLM 구현체 (기본)
+    ├── GeminiService.java              # Gemini API 구현체
+    ├── OllamaService.java              # Ollama 로컬 LLM 구현체 (GPU 필요)
     ├── NaverNewsProducer.java
     ├── NewsConsumer.java               # DB 저장만 담당
-    ├── NewsAnalysisScheduler.java      # 배치 분석 + Tag 저장
+    ├── NewsAnalysisScheduler.java      # 배치 분석 + Tag 저장 (AiAnalyzer 의존)
     ├── TrendService.java               # 트렌드 키워드 집계
     └── NewsService.java
 ```
@@ -91,7 +98,7 @@ src/main/java/com/example/trendstream/
 ### 4.1 Data Pipeline (Completed)
 - **Producer**: 5분마다 Naver API에서 뉴스 수집, 중복 방지 캐시 적용
 - **Consumer**: 날짜 파싱, 중복 체크, DB 저장 (AI 분석 분리)
-- **AI 배치 분석**: 30초마다 5개씩 묶어서 Gemini API 호출 (80% 절약)
+- **AI 배치 분석**: 10초마다 3개씩 묶어서 AI 분석 (Groq/Gemini/Ollama 선택 가능)
 
 ### 4.2 REST API (Completed)
 | Endpoint | Method | Description |
@@ -123,6 +130,7 @@ src/main/java/com/example/trendstream/
 | Kafka | 9092 | Message Queue |
 | Kafka UI | 8080 | Kafka 모니터링 |
 | Zookeeper | 2181 | Kafka 코디네이터 |
+| Ollama | 11434 | 로컬 LLM 서버 (선택) |
 
 ## 6. Current Status
 - ✅ 인프라 구축 완료 (Docker)
@@ -131,6 +139,7 @@ src/main/java/com/example/trendstream/
 - ✅ REST API 개발 완료 (NewsController)
 - ✅ Swagger 문서화 완료
 - ✅ 실시간 트렌드 분석 완료 (TrendController)
+- ✅ Ollama 로컬 LLM 하이브리드 완료 (AiAnalyzer 인터페이스)
 
 ## 7. 향후 개발 방향 (Roadmap)
 
@@ -140,7 +149,7 @@ src/main/java/com/example/trendstream/
 
 ### 2단계: 서비스 가치 증대 (Current)
 - **프론트엔드 개발**: Next.js로 뉴스 목록 UI 개발 (별도 저장소)
-- **Ollama 하이브리드**: 로컬 LLM 도입으로 API 한도 완전 해결 (계획 중)
+- ~~**Ollama 하이브리드**: 로컬 LLM 도입으로 API 한도 완전 해결~~ ✅
 - ~~**실시간 트렌드 분석**: 키워드 집계 → 트렌드 순위 표시~~ ✅
 - **검색 기능 고도화**: AI 요약 검색, Elasticsearch 도입 검토
 

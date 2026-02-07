@@ -1,4 +1,4 @@
-package com.example.trendstream.service;
+package com.example.trendstream.service.consumer;
 
 import com.example.trendstream.domain.entity.News;
 import com.example.trendstream.domain.enums.NewsType;
@@ -70,10 +70,11 @@ public class NewsConsumer {
                 .title(message.getTitle())
                 .link(message.getLink())
                 .description(message.getDescription())
-                .source("Naver Open API")
-                .type(NewsType.NEWS)
+                .source(message.getSource())  // Producer가 보낸 소스 사용
+                .type(message.getType())      // Producer가 보낸 타입 사용
                 .pubDate(publishedAt)
                 .aiResult(null)  // AI 분석은 스케줄러가 배치로 처리
+                .searchKeyword(message.getSearchKeyword())
                 .build();
 
         newsRepository.save(news);

@@ -117,7 +117,7 @@ public class NewsController {
             @Parameter(description = "검색할 키워드", required = true, example = "AI")
             @RequestParam String keyword,
             @Parameter(hidden = true)
-            @PageableDefault(size = 10, sort = "pubDate", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(newsService.searchNews(keyword, pageable));
     }
 
@@ -145,5 +145,120 @@ public class NewsController {
             @Parameter(hidden = true)
             @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(newsService.getPopularNews(pageable));
+    }
+
+    /**
+     * 태그(키워드)로 뉴스 검색
+     *
+     * [API 스펙]
+     * - URL: GET /api/news/tag?name={tagName}
+     * - Query Params: name(필수), page, size
+     *
+     * [요청 예시]
+     * - GET /api/news/tag?name=spring        -> "spring" 태그 뉴스
+     * - GET /api/news/tag?name=ai&page=1     -> "ai" 태그 2페이지
+     *
+     * @param name 검색할 태그 이름
+     * @param pageable 페이지 정보
+     * @return 태그 검색 결과 (200 OK)
+     */
+    @Operation(summary = "태그 기반 뉴스 검색", description = "AI가 추출한 키워드(태그)로 뉴스를 검색합니다. 정확한 태그 매칭으로 빠른 검색이 가능합니다.")
+    @GetMapping("/tag")
+    public ResponseEntity<Page<NewsResponseDto>> searchByTag(
+            @Parameter(description = "검색할 태그 이름", required = true, example = "spring")
+            @RequestParam String name,
+            @Parameter(hidden = true)
+            @PageableDefault(size = 10) Pageable pageable) {
+        // Native Query에서 ORDER BY 직접 지정 (pub_date DESC)
+        return ResponseEntity.ok(newsService.searchByTag(name, pageable));
+    }
+
+    /**
+     * 카테고리별 뉴스 조회
+     *
+     * [API 스펙]
+     * - URL: GET /api/news/category?name={categoryName}
+     * - Query Params: name(필수), page, size
+     *
+     * [카테고리란?]
+     * - Naver API 검색 시 사용된 키워드 (백엔드, AI, 클라우드 등)
+     * - searchKeyword 필드에 저장됨
+     *
+     * [요청 예시]
+     * - GET /api/news/category?name=AI             -> "AI" 카테고리 뉴스
+     * - GET /api/news/category?name=백엔드&page=1   -> "백엔드" 카테고리 2페이지
+     *
+     * @param name 카테고리명 (검색 키워드)
+     * @param pageable 페이지 정보
+     * @return 해당 카테고리의 뉴스 목록 (200 OK)
+     */
+    @Operation(summary = "카테고리별 뉴스 조회", description = "Naver API 검색 키워드(카테고리)별로 뉴스를 조회합니다.")
+    @GetMapping("/category")
+    public ResponseEntity<Page<NewsResponseDto>> getNewsByCategory(
+            @Parameter(description = "카테고리명 (검색 키워드)", required = true, example = "AI")
+            @RequestParam String name,
+            @Parameter(hidden = true)
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(newsService.getNewsByCategory(name, pageable));
+    }
+
+    /**
+     * 사용 가능한 카테고리 목록 조회
+     *
+     * [API 스펙]
+     * - URL: GET /api/news/categories
+     *
+     * [응답 예시]
+     * - ["AI", "백엔드", "클라우드", "자바", "여기어때"]
+     *
+     * @return 카테고리 목록 (200 OK)
+     */
+    @Operation(summary = "카테고리 목록 조회", description = "사용 가능한 모든 카테고리(검색 키워드) 목록을 조회합니다.")
+    @GetMapping("/categories")
+    public ResponseEntity<java.util.List<String>> getCategories() {
+        return ResponseEntity.ok(newsService.getCategories());
+    }
+
+    /**
+     * 소스별 뉴스 조회
+     *
+     * [API 스펙]
+     * - URL: GET /api/news/source?name={sourceName}
+     * - Query Params: name(필수), page, size
+     *
+     * [소스 종류]
+     * - "Naver API": 네이버 뉴스
+     * - "Hacker News": 해커 뉴스
+     * - "GeekNews": 긱뉴스
+     *
+     * @param name 소스명
+     * @param pageable 페이지 정보
+     * @return 해당 소스의 뉴스 목록 (200 OK)
+     */
+    @Operation(summary = "소스별 뉴스 조회", description = "뉴스 출처(Naver, Hacker News, GeekNews)별로 뉴스를 조회합니다.")
+    @GetMapping("/source")
+    public ResponseEntity<Page<NewsResponseDto>> getNewsBySource(
+            @Parameter(description = "소스명", required = true, example = "Hacker News")
+            @RequestParam String name,
+            @Parameter(hidden = true)
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(newsService.getNewsBySource(name, pageable));
+    }
+
+    /**
+     * 사용 가능한 소스 목록 조회
+     *
+     * [API 스펙]
+     * - URL: GET /api/news/sources
+     *
+     * [응답 예시]
+     * - ["GeekNews", "Hacker News", "Naver API"]
+     *
+     * @return 소스 목록 (200 OK)
+     */
+    @Operation(summary = "소스 목록 조회", description = "사용 가능한 모든 뉴스 소스 목록을 조회합니다.")
+    @GetMapping("/sources")
+    public ResponseEntity<java.util.List<String>> getSources() {
+        return ResponseEntity.ok(newsService.getSources());
     }
 }

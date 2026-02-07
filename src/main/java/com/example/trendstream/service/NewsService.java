@@ -5,6 +5,7 @@ import com.example.trendstream.dto.NewsResponseDto;
 import com.example.trendstream.repository.NewsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,24 +67,40 @@ public class NewsService {
     }
 
     /**
-     * 키워드로 뉴스 검색
+     * 키워드로 뉴스 검색 (제목 + 설명 + AI 요약)
      *
      * [검색 범위]
      * - 뉴스 제목 (title)
      * - 뉴스 설명/본문 (description)
-     * - LIKE %keyword% 패턴으로 부분 일치 검색
-     *
-     * [향후 개선 포인트]
-     * - 전문 검색 엔진 도입 (Elasticsearch)
-     * - 형태소 분석을 통한 한국어 검색 최적화
-     * - AI 요약(summary) 필드 검색 추가
+     * - AI 요약 (ai_result.summary)
      *
      * @param keyword 검색 키워드
      * @param pageable 페이지 정보
      * @return 검색 결과 (페이지네이션)
      */
     public Page<NewsResponseDto> searchNews(String keyword, Pageable pageable) {
-        return newsRepository.searchByKeyword(keyword, pageable)
+        // Native Query에서 ORDER BY 직접 지정하므로 sort 제외
+        Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        return newsRepository.searchByKeyword(keyword, unsortedPageable)
+                .map(NewsResponseDto::from);
+    }
+
+    /**
+     * 태그(키워드)로 뉴스 검색
+     *
+     * [특징]
+     * - AI가 추출한 키워드(태그)로 정확 매칭
+     * - 인덱스 사용 가능 → 빠름
+     * - Native Query에서 ORDER BY 직접 처리 (Pageable sort 제외)
+     *
+     * @param tagName 검색할 태그 이름
+     * @param pageable 페이지 정보
+     * @return 해당 태그가 있는 뉴스 목록
+     */
+    public Page<NewsResponseDto> searchByTag(String tagName, Pageable pageable) {
+        // Native Query에서 ORDER BY 직접 지정하므로 sort 제외
+        Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        return newsRepository.findByTagName(tagName.toLowerCase(), unsortedPageable)
                 .map(NewsResponseDto::from);
     }
 
@@ -105,5 +122,57 @@ public class NewsService {
     public Page<NewsResponseDto> getPopularNews(Pageable pageable) {
         return newsRepository.findAllByOrderByScoreDesc(pageable)
                 .map(NewsResponseDto::from);
+    }
+
+    /**
+     * 카테고리(검색 키워드)별 뉴스 조회
+     *
+     * [특징]
+     * - Naver API 검색 시 사용된 키워드로 그룹화
+     * - 예: "백엔드", "AI", "클라우드" 등
+     *
+     * @param category 카테고리명 (검색 키워드)
+     * @param pageable 페이지 정보
+     * @return 해당 카테고리의 뉴스 목록
+     */
+    public Page<NewsResponseDto> getNewsByCategory(String category, Pageable pageable) {
+        // Native Query에서 ORDER BY 직접 지정하므로 sort 제외
+        Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        return newsRepository.findBySearchKeyword(category, unsortedPageable)
+                .map(NewsResponseDto::from);
+    }
+
+    /**
+     * 사용 가능한 카테고리 목록 조회
+     *
+     * @return 카테고리 목록 (중복 제거된 검색 키워드)
+     */
+    public java.util.List<String> getCategories() {
+        return newsRepository.findDistinctSearchKeywords();
+    }
+
+    /**
+     * 소스별 뉴스 조회
+     *
+     * [특징]
+     * - 뉴스 출처로 그룹화 (Naver API, Hacker News, GeekNews)
+     *
+     * @param source 소스명
+     * @param pageable 페이지 정보
+     * @return 해당 소스의 뉴스 목록
+     */
+    public Page<NewsResponseDto> getNewsBySource(String source, Pageable pageable) {
+        Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        return newsRepository.findBySource(source, unsortedPageable)
+                .map(NewsResponseDto::from);
+    }
+
+    /**
+     * 사용 가능한 소스 목록 조회
+     *
+     * @return 소스 목록 (Naver API, Hacker News, GeekNews)
+     */
+    public java.util.List<String> getSources() {
+        return newsRepository.findDistinctSources();
     }
 }

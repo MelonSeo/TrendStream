@@ -14,7 +14,8 @@ public class NewsMessage { //수집기(Producer)가 Kafka에 던질 "택배 상�
     private String title;
     private String link;
     private String description;
-    private String source;     // 출처 (예: Naver API)
-    private NewsType type;     // 분류 (NEWS, BLOG, COMMUNITY)
-    private String pubDateStr; // 날짜는 문자열로 일단 보냄
+    private String source;        // 출처 (예: Naver API)
+    private NewsType type;        // 분류 (NEWS, BLOG, COMMUNITY)
+    private String pubDateStr;    // 날짜는 문자열로 일단 보냄
+    private String searchKeyword; // 검색에 사용된 키워드 (예: "AI", "클라우드")
 }

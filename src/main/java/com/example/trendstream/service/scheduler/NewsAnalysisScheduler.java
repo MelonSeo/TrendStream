@@ -1,10 +1,11 @@
-package com.example.trendstream.service;
+package com.example.trendstream.service.scheduler;
 
 import com.example.trendstream.domain.entity.News;
 import com.example.trendstream.domain.entity.NewsTag;
 import com.example.trendstream.domain.entity.Tag;
 import com.example.trendstream.domain.vo.AiResponse;
 import com.example.trendstream.repository.NewsRepository;
+import com.example.trendstream.service.ai.AiAnalyzer;
 import com.example.trendstream.repository.NewsTagRepository;
 import com.example.trendstream.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,18 +22,14 @@ import java.util.Locale;
 /**
  * 뉴스 AI 분석 스케줄러 (배치 처리)
  *
- * [도입 배경]
- * - 기존: 뉴스 1개당 API 1회 호출 → 무료 한도 빠르게 소진
- * - 개선: 3개씩 묶어서 1회 호출 → API 호출 절약
- *
  * [동작 방식]
- * 1. 주기적으로 AI 분석 안 된 뉴스 조회 (aiResult = null)
- * 2. 최대 3개씩 배치로 Gemini API 호출
- * 3. 분석 결과를 각 뉴스에 업데이트
+ * 1. 미분석 뉴스 조회 (aiResult = null) → 배치 분석
+ * 2. 분석 실패 뉴스 조회 (summary = '분석 실패') → 재분석
  *
  * [실행 주기]
- * - 30초마다 실행 (Gemini 무료 티어 Rate Limit 고려)
- * - 한 번에 최대 3개 처리
+ * - ai.analysis.interval 프로퍼티로 설정 (기본 10초)
+ * - Ollama(로컬): Rate Limit 없으므로 짧게 설정 가능
+ * - Gemini(외부): 30초 이상 권장 (분당 15회 제한)
  */
 @Slf4j
 @Service
@@ -40,7 +37,7 @@ import java.util.Locale;
 public class NewsAnalysisScheduler {
 
     private final NewsRepository newsRepository;
-    private final GeminiService geminiService;
+    private final AiAnalyzer aiAnalyzer;
     private final TagRepository tagRepository;
     private final NewsTagRepository newsTagRepository;
 
@@ -48,40 +45,38 @@ public class NewsAnalysisScheduler {
     private static final int BATCH_SIZE = 3;
 
     /**
-     * AI 분석 배치 작업 (30초마다 실행)
+     * AI 분석 배치 작업 (설정 간격마다 실행)
      *
-     * [Rate Limit 고려]
-     * - Gemini 무료 티어: 분당 15회 제한
-     * - 30초 간격 + 3개 배치 = 분당 2회 호출 (여유 있음)
-     *
-     * [처리 흐름]
-     * 1. aiResult가 null인 뉴스 3개 조회
-     * 2. 없으면 스킵
-     * 3. Gemini 배치 분석 호출
-     * 4. 각 뉴스에 결과 업데이트
+     * [처리 우선순위]
+     * 1순위: aiResult가 null인 뉴스 (미분석)
+     * 2순위: 분석 실패한 뉴스 (재분석)
      */
-    @Scheduled(fixedDelay = 30000)  // 30초마다 실행 (이전 작업 완료 후 30초 대기)
+    @Scheduled(fixedDelayString = "${ai.analysis.interval:10000}")
     @Transactional
     public void analyzeUnprocessedNews() {
-        // 1. AI 분석 안 된 뉴스 조회
-        Page<News> unprocessedPage = newsRepository.findByAiResultIsNull(
-                PageRequest.of(0, BATCH_SIZE));
+        // 1. 미분석 뉴스 우선 조회
+        List<News> targetNews = newsRepository.findByAiResultIsNull(
+                PageRequest.of(0, BATCH_SIZE)).getContent();
 
-        List<News> unprocessedNews = unprocessedPage.getContent();
+        // 2. 미분석 뉴스 없으면 → 분석 실패 뉴스 조회 (재분석)
+        if (targetNews.isEmpty()) {
+            targetNews = newsRepository.findByAiResultFailed(
+                    PageRequest.of(0, BATCH_SIZE)).getContent();
+        }
 
-        if (unprocessedNews.isEmpty()) {
+        if (targetNews.isEmpty()) {
             log.debug(">>>> [Scheduler] 분석 대기 중인 뉴스 없음");
             return;
         }
 
-        log.info(">>>> [Scheduler] 배치 분석 시작: {}개 뉴스", unprocessedNews.size());
+        log.info(">>>> [Scheduler] 배치 분석 시작: {}개 뉴스", targetNews.size());
 
-        // 2. 배치 분석 요청
-        List<AiResponse> results = geminiService.analyzeBatchNews(unprocessedNews);
+        // 3. 배치 분석 요청
+        List<AiResponse> results = aiAnalyzer.analyzeBatchNews(targetNews);
 
-        // 3. 결과 매핑 및 업데이트
-        for (int i = 0; i < unprocessedNews.size() && i < results.size(); i++) {
-            News news = unprocessedNews.get(i);
+        // 4. 결과 매핑 및 업데이트
+        for (int i = 0; i < targetNews.size() && i < results.size(); i++) {
+            News news = targetNews.get(i);
             AiResponse aiResult = results.get(i);
 
             news.updateAiResult(aiResult);
@@ -92,10 +87,10 @@ public class NewsAnalysisScheduler {
                     aiResult.getScore());
         }
 
-        // 4. 변경사항 저장 (Dirty Checking으로 자동 저장되지만 명시적으로 호출)
-        newsRepository.saveAll(unprocessedNews);
+        // 5. 변경사항 저장
+        newsRepository.saveAll(targetNews);
 
-        log.info(">>>> [Scheduler] 배치 분석 완료: {}개 처리됨", unprocessedNews.size());
+        log.info(">>>> [Scheduler] 배치 분석 완료: {}개 처리됨", targetNews.size());
     }
 
     /**

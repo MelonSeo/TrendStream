@@ -1,0 +1,15 @@
+# TrendStream Reverse Proxy Configuration
+#
+# 사용법:
+# 1. 도메인이 있는 경우: your-domain.com 부분을 실제 도메인으로 변경
+# 2. 도메인이 없는 경우: :80 으로 변경 (HTTP만 사용)
+
+# 도메인 사용 시 (HTTPS 자동 적용)
+# your-domain.com {
+#     reverse_proxy app:8081
+# }
+
+# IP 직접 접속 시 (도메인 없을 때)
+:80 {
+    reverse_proxy app:8081
+}
