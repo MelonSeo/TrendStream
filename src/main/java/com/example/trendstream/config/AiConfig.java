@@ -22,7 +22,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AiConfig {
 
-    @Value("${ai.provider:gemini}")
+    @Value("${ai.provider:groq}")
     private String aiProvider;
 
     @Bean

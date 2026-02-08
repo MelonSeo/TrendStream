@@ -70,7 +70,7 @@ public class NaverNewsProducer {
 
         URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
                 .queryParam("query", keyword)
-                .queryParam("display", 50)
+                .queryParam("display", 30)
                 .queryParam("sort", "date") // 최신순
                 .encode(StandardCharsets.UTF_8)
                 .build()

@@ -26,7 +26,6 @@ repositories {
 
 dependencies {
 	// 1. Web & Validation (API 서버용 필수)
-	// 주의: 단순 starter가 아니라 'starter-web'이어야 Tomcat이 실행됩니다.
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
@@ -50,8 +49,8 @@ dependencies {
 	// RSS 파싱 (Rome 라이브러리)
 	implementation 'com.rometools:rome:1.18.0'
 
-	// API 문서화 (Swagger UI) -> http://localhost:8080/swagger-ui/index.html
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+	// API 문서화 (Swagger UI) -> http://localhost:8081/swagger-ui/index.html
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4'
 
 	// MySQL JSON 타입 매핑 유틸 (JPA에서 JSON 쉽게 쓰기 위함)
 	implementation 'io.hypersistence:hypersistence-utils-hibernate-63:3.7.3'
