@@ -14,14 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Groq 클라우드 LLM 분석 서비스
- *
- * [특징]
- * - OpenAI 호환 API (chat/completions 엔드포인트)
- * - 무료 티어: llama-3.1-8b-instant 기준 RPM 30, RPD 14,400
- * - 응답 속도가 매우 빠름 (LPU 추론 엔진)
- */
+
 @Slf4j
 @RequiredArgsConstructor
 public class GroqService implements AiAnalyzer {
@@ -140,7 +133,6 @@ public class GroqService implements AiAnalyzer {
 
     /**
      * 응답에서 JSON 배열만 추출
-     * AI가 "뉴스 분석 결과:" 같은 텍스트를 앞에 붙이는 경우 처리
      */
     private String extractJsonArray(String content) {
         // 코드 블록 제거

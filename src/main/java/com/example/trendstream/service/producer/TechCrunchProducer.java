@@ -22,18 +22,6 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * TechCrunch RSS 뉴스 Producer
- *
- * [특징]
- * - 글로벌 IT/스타트업 뉴스 매체
- * - 펀딩, 인수합병, 신제품 출시 등 비즈니스 관점 뉴스
- * - 영어권 최대 테크 뉴스 사이트 중 하나
- *
- * [수집 주기]
- * - 20분마다 최신 글 수집
- * - 메모리 캐시로 중복 방지
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

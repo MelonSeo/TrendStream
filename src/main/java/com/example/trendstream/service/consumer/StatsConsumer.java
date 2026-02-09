@@ -12,21 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/**
- * 통계 집계 Consumer
- *
- * [Consumer Group]
- * - stats-group (NewsConsumer의 news-group과 별도)
- * - 같은 토픽(dev-news)을 독립적으로 소비
- *
- * [처리 내용]
- * - 소스별, 시간별 뉴스 카운트 집계
- * - news_stats 테이블에 upsert
- *
- * [Kafka 핵심 개념]
- * - 하나의 토픽을 여러 Consumer Group이 독립적으로 소비 가능
- * - 각 그룹은 모든 메시지를 받음 (브로드캐스트 효과)
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

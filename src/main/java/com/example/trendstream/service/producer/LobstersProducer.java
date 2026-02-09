@@ -22,18 +22,6 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Lobsters RSS 뉴스 Producer
- *
- * [특징]
- * - Hacker News 대안으로 시작된 기술 링크 공유 커뮤니티
- * - 초대제 가입으로 스팸이 적고 고품질 콘텐츠
- * - 프로그래밍, 시스템 관리, 보안 등 기술 주제 중심
- *
- * [수집 주기]
- * - 15분마다 최신 글 수집
- * - 메모리 캐시로 중복 방지
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

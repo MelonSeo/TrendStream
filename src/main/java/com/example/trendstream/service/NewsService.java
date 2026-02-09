@@ -12,19 +12,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 뉴스 조회 서비스
- *
- * [Service 계층의 역할]
- * 1. 비즈니스 로직 처리 (Controller는 요청/응답만 담당)
- * 2. 트랜잭션 경계 설정
- * 3. 여러 Repository를 조합한 복합 로직 처리
- *
- * [@Transactional(readOnly = true) 사용 이유]
- * - 읽기 전용 트랜잭션으로 설정하면 JPA가 변경 감지(Dirty Checking)를 수행하지 않음
- * - 플러시(flush)를 생략하여 성능 최적화
- * - 데이터베이스에 따라 읽기 전용 연결 사용 (Replica DB 활용 가능)
- */
 @Service
 @RequiredArgsConstructor  // final 필드를 파라미터로 받는 생성자 자동 생성 (의존성 주입)
 @Transactional(readOnly = true)  // 클래스 레벨 기본 트랜잭션 설정
@@ -32,54 +19,17 @@ public class NewsService {
 
     private final NewsRepository newsRepository;  // 생성자 주입 (스프링 권장 방식)
 
-    /**
-     * ID로 뉴스 상세 조회
-     *
-     * [Fetch Join 사용 이유]
-     * - 뉴스와 연관된 태그를 한 번의 쿼리로 가져옴 (N+1 문제 방지)
-     * - LAZY 로딩이더라도 JOIN FETCH로 즉시 로딩 가능
-     *
-     * @param id 조회할 뉴스 ID
-     * @return 뉴스 상세 정보 DTO
-     * @throws NewsNotFoundException 뉴스가 존재하지 않을 경우 (404 응답으로 변환됨)
-     */
     public NewsResponseDto getNewsById(Long id) {
         News news = newsRepository.findByIdWithTags(id)
                 .orElseThrow(() -> new NewsNotFoundException(id));
         return NewsResponseDto.from(news);
     }
 
-    /**
-     * 최신순 뉴스 목록 조회 (페이지네이션)
-     *
-     * [Page 객체가 제공하는 정보]
-     * - content: 실제 데이터 리스트
-     * - totalElements: 전체 데이터 개수
-     * - totalPages: 전체 페이지 수
-     * - number: 현재 페이지 번호 (0부터 시작)
-     * - size: 페이지당 데이터 개수
-     * - first/last: 첫 페이지/마지막 페이지 여부
-     *
-     * @param pageable 페이지 정보 (page, size, sort)
-     * @return 페이지네이션된 뉴스 목록
-     */
     public Page<NewsResponseDto> getLatestNews(Pageable pageable) {
         return newsRepository.findAllByOrderByPubDateDesc(pageable)
                 .map(NewsResponseDto::from);  // Page<News> -> Page<NewsResponseDto> 변환
     }
 
-    /**
-     * 키워드로 뉴스 검색 (제목 + 설명 + AI 요약)
-     *
-     * [검색 범위]
-     * - 뉴스 제목 (title)
-     * - 뉴스 설명/본문 (description)
-     * - AI 요약 (ai_result.summary)
-     *
-     * @param keyword 검색 키워드
-     * @param pageable 페이지 정보
-     * @return 검색 결과 (페이지네이션)
-     */
     public Page<NewsResponseDto> searchNews(String keyword, Pageable pageable) {
         // Native Query에서 ORDER BY 직접 지정하므로 sort 제외
         Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
@@ -87,18 +37,6 @@ public class NewsService {
                 .map(NewsResponseDto::from);
     }
 
-    /**
-     * 태그(키워드)로 뉴스 검색
-     *
-     * [특징]
-     * - AI가 추출한 키워드(태그)로 정확 매칭
-     * - 인덱스 사용 가능 → 빠름
-     * - Native Query에서 ORDER BY 직접 처리 (Pageable sort 제외)
-     *
-     * @param tagName 검색할 태그 이름
-     * @param pageable 페이지 정보
-     * @return 해당 태그가 있는 뉴스 목록
-     */
     public Page<NewsResponseDto> searchByTag(String tagName, Pageable pageable) {
         // Native Query에서 ORDER BY 직접 지정하므로 sort 제외
         Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
@@ -106,37 +44,11 @@ public class NewsService {
                 .map(NewsResponseDto::from);
     }
 
-    /**
-     * 인기 뉴스 조회 (AI 중요도 점수순)
-     *
-     * [중요도 점수 (score)]
-     * - GeminiService가 뉴스 분석 후 0~100 사이 점수 부여
-     * - 점수 기준: 영향력, 시의성, 기술적 중요도 등
-     * - JSON 필드 내부 값으로 정렬 (MySQL JSON_EXTRACT 함수 사용)
-     *
-     * [Native Query 사용 이유]
-     * - JPQL은 JSON 필드 내부 접근을 직접 지원하지 않음
-     * - MySQL의 JSON_EXTRACT() 함수로 aiResult.score 값 추출
-     *
-     * @param pageable 페이지 정보
-     * @return 중요도순 뉴스 목록
-     */
     public Page<NewsResponseDto> getPopularNews(Pageable pageable) {
         return newsRepository.findAllByOrderByScoreDesc(pageable)
                 .map(NewsResponseDto::from);
     }
 
-    /**
-     * 카테고리(검색 키워드)별 뉴스 조회
-     *
-     * [특징]
-     * - Naver API 검색 시 사용된 키워드로 그룹화
-     * - 예: "백엔드", "AI", "클라우드" 등
-     *
-     * @param category 카테고리명 (검색 키워드)
-     * @param pageable 페이지 정보
-     * @return 해당 카테고리의 뉴스 목록
-     */
     public Page<NewsResponseDto> getNewsByCategory(String category, Pageable pageable) {
         // Native Query에서 ORDER BY 직접 지정하므로 sort 제외
         Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
@@ -144,47 +56,17 @@ public class NewsService {
                 .map(NewsResponseDto::from);
     }
 
-    /**
-     * 사용 가능한 카테고리 목록 조회
-     *
-     * [@Cacheable 적용 이유]
-     * - 카테고리 목록은 거의 변경되지 않음 (Producer 추가 시에만 변경)
-     * - 매 요청마다 DISTINCT 쿼리 실행은 비효율적
-     * - TTL 1시간: RedisConfig에서 설정
-     *
-     * @return 카테고리 목록 (중복 제거된 검색 키워드)
-     */
     @Cacheable(value = "categories")
     public java.util.List<String> getCategories() {
         return newsRepository.findDistinctSearchKeywords();
     }
 
-    /**
-     * 소스별 뉴스 조회
-     *
-     * [특징]
-     * - 뉴스 출처로 그룹화 (Naver API, Hacker News, GeekNews)
-     *
-     * @param source 소스명
-     * @param pageable 페이지 정보
-     * @return 해당 소스의 뉴스 목록
-     */
     public Page<NewsResponseDto> getNewsBySource(String source, Pageable pageable) {
         Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
         return newsRepository.findBySource(source, unsortedPageable)
                 .map(NewsResponseDto::from);
     }
 
-    /**
-     * 사용 가능한 소스 목록 조회
-     *
-     * [@Cacheable 적용 이유]
-     * - 소스 목록은 거의 변경되지 않음 (Producer 추가 시에만 변경)
-     * - 매 요청마다 DISTINCT 쿼리 실행은 비효율적
-     * - TTL 1시간: RedisConfig에서 설정
-     *
-     * @return 소스 목록 (Naver API, Hacker News, GeekNews 등)
-     */
     @Cacheable(value = "sources")
     public java.util.List<String> getSources() {
         return newsRepository.findDistinctSources();

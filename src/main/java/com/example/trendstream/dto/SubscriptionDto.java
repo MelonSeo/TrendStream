@@ -11,9 +11,7 @@ import java.util.List;
 
 public class SubscriptionDto {
 
-    /**
-     * 구독 생성 요청
-     */
+
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
@@ -23,9 +21,7 @@ public class SubscriptionDto {
         private String keyword;
     }
 
-    /**
-     * 구독 응답
-     */
+
     @Getter
     @Builder
     @NoArgsConstructor
@@ -46,9 +42,7 @@ public class SubscriptionDto {
         }
     }
 
-    /**
-     * 사용자 구독 목록 응답
-     */
+
     @Getter
     @Builder
     @NoArgsConstructor

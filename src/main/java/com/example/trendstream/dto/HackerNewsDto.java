@@ -3,11 +3,7 @@ package com.example.trendstream.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 
-/**
- * Hacker News API 응답 DTO
- *
- * API: https://hacker-news.firebaseio.com/v0/item/{id}.json
- */
+
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class HackerNewsDto {

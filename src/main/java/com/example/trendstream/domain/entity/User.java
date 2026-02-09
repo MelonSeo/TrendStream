@@ -7,13 +7,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 사용자 엔티티
- *
- * [용도]
- * - 키워드 구독 기능의 주체
- * - 알림 수신 대상
- */
+
 @Entity
 @Table(name = "users",
         indexes = @Index(name = "idx_user_email", columnList = "email"))
@@ -50,9 +44,7 @@ public class User {
     @Builder.Default
     private List<Subscription> subscriptions = new ArrayList<>();
 
-    /**
-     * 구독 추가
-     */
+
     public void addSubscription(Subscription subscription) {
         this.subscriptions.add(subscription);
         subscription.setUser(this);

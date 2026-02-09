@@ -14,18 +14,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
-/**
- * Kafka 뉴스 메시지 소비자
- *
- * [역할 변경 - 배치 처리 도입]
- * - AS-IS: 메시지 수신 → AI 분석 → DB 저장
- * - TO-BE: 메시지 수신 → DB 저장만 (AI 분석은 스케줄러가 배치로 처리)
- *
- * [AI 분석 분리 이유]
- * - API 호출 최적화: 5개씩 묶어서 1회 호출 (80% 절약)
- * - 무료 한도 효율적 사용
- * - 분석 실패해도 뉴스 데이터는 보존
- */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -36,15 +25,6 @@ public class NewsConsumer {
     private static final DateTimeFormatter NAVER_DATE_FORMAT =
             DateTimeFormatter.ofPattern("EEE, d MMM yyyy HH:mm:ss Z", Locale.ENGLISH);
 
-    /**
-     * Kafka 메시지 소비 - DB 저장만 담당
-     *
-     * [처리 흐름]
-     * 1. 중복 체크 (link 기준)
-     * 2. 날짜 파싱
-     * 3. DB 저장 (aiResult = null)
-     * 4. AI 분석은 NewsAnalysisScheduler가 별도로 처리
-     */
     @KafkaListener(topics = "dev-news", groupId = "news-group")
     @Transactional
     public void consumeNews(NewsMessage message) {

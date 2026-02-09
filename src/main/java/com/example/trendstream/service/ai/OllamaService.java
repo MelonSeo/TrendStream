@@ -16,14 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Ollama 로컬 LLM 분석 서비스
- *
- * [특징]
- * - 로컬에서 실행되므로 API 한도 제한 없음
- * - GeminiService와 동일한 프롬프트 사용
- * - Ollama REST API (POST /api/generate) 호출
- */
 @Slf4j
 @RequiredArgsConstructor
 public class OllamaService implements AiAnalyzer {

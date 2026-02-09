@@ -22,18 +22,6 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * 요즘IT (Yozm) RSS 뉴스 Producer
- *
- * [특징]
- * - 위시켓에서 운영하는 IT 콘텐츠 플랫폼
- * - 개발, 디자인, 기획, 마케팅 등 IT 업계 전반의 양질의 콘텐츠
- * - 한국어 IT 뉴스/아티클 중심
- *
- * [수집 주기]
- * - 15분마다 최신 글 수집
- * - 메모리 캐시로 중복 방지
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

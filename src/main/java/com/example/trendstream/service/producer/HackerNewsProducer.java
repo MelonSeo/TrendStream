@@ -19,19 +19,6 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Hacker News Producer
- *
- * [API 스펙]
- * - Base URL: https://hacker-news.firebaseio.com/v0/
- * - /newstories.json: 최신 스토리 ID 배열 (최대 500개)
- * - /item/{id}.json: 개별 아이템 상세
- *
- * [수집 전략]
- * - 10분마다 최신 스토리 30개 조회
- * - type=story이고 url이 있는 것만 수집 (Ask HN, Show HN without link 제외)
- * - 중복 방지를 위한 메모리 캐시 사용
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

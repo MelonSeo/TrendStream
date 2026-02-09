@@ -54,7 +54,7 @@ public class KafkaConfig {
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
         // Consumer는 DB 저장만 담당 → 빠르게 소비 (AI 분석은 Scheduler가 배치 처리)
-        config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 100); // 한 번에 100개까지 가져옴
+        config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 100);
 
         // JSON을 자바 객체(NewsMessage)로 다시 변환하는 설정
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
@@ -66,7 +66,7 @@ public class KafkaConfig {
     }
 
     // ======================================================
-    // 3. Listener 공장 (병렬 처리 설정)
+    // 3. Listener (병렬 처리 설정)
     // ======================================================
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory() {

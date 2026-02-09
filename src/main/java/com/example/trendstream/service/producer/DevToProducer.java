@@ -23,18 +23,6 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Dev.to RSS 뉴스 Producer
- *
- * [특징]
- * - 개발자 블로그 플랫폼의 최신 글 수집
- * - 매일 수백 개의 글이 올라오는 활발한 커뮤니티
- * - 고품질 기술 블로그 콘텐츠
- *
- * [수집 주기]
- * - 15분마다 최신 글 수집
- * - 메모리 캐시로 중복 방지 (DB 중복 체크와 별개)
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

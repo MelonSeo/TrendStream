@@ -9,15 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * 트렌드 분석 서비스
- *
- * [동작 방식]
- * 1. 기간(period)을 LocalDateTime으로 변환
- * 2. NewsTagRepository로 키워드 빈도 집계
- * 3. 각 키워드별 관련 뉴스 3개 조회
- * 4. TrendResponseDto로 조립하여 반환
- */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -27,17 +18,6 @@ public class TrendService {
 
     private static final int RELATED_NEWS_LIMIT = 3;
 
-    /**
-     * 상위 트렌드 키워드 조회
-     *
-     * [캐싱 미적용 사유]
-     * - GenericJackson2JsonRedisSerializer가 List<DTO> 역직렬화 시 타입 정보 문제 발생
-     * - 추후 Jackson2JsonRedisSerializer + 명시적 타입 지정으로 개선 예정
-     *
-     * @param period 기간 ("24h", "7d", "30d")
-     * @param limit 상위 N개 키워드
-     * @return 트렌드 키워드 + 관련 뉴스 목록
-     */
     public List<TrendResponseDto> getTopTrends(String period, int limit) {
         LocalDateTime since = parsePeriod(period);
 
@@ -72,12 +52,6 @@ public class TrendService {
                 .toList();
     }
 
-    /**
-     * 기간 문자열을 LocalDateTime으로 변환
-     *
-     * @param period "24h", "7d", "30d"
-     * @return 현재 시각 기준으로 과거 시점
-     */
     private LocalDateTime parsePeriod(String period) {
         LocalDateTime now = LocalDateTime.now();
 

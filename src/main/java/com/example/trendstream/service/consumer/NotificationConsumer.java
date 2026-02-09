@@ -12,24 +12,6 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Set;
 
-/**
- * 알림 Consumer
- *
- * [Consumer Group]
- * - notification-group (NewsConsumer, StatsConsumer와 별도)
- * - 같은 토픽(dev-news)을 독립적으로 소비
- *
- * [처리 흐름]
- * 1. 뉴스 메시지 수신
- * 2. 제목/설명에서 키워드 매칭
- * 3. 매칭된 구독자에게 알림 발송
- *
- * [Kafka 핵심 개념]
- * - 3개의 Consumer Group이 같은 토픽을 독립적으로 소비
- * - news-group: DB 저장
- * - stats-group: 통계 집계
- * - notification-group: 알림 발송
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

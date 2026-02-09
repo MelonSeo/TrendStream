@@ -22,18 +22,6 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * GeekNews (긱뉴스) Producer
- *
- * [RSS 스펙]
- * - URL: https://news.hada.io/rss/news (Feedburner로 리다이렉트)
- * - 형식: Atom 1.0
- * - 필드: title, link, content, published
- *
- * [수집 전략]
- * - 10분마다 RSS 피드 전체 조회
- * - 중복 방지를 위한 링크 캐시 사용
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

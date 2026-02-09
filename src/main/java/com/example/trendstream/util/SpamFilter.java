@@ -3,18 +3,6 @@ package com.example.trendstream.util;
 import java.util.List;
 import java.util.regex.Pattern;
 
-/**
- * 스팸 필터 유틸리티
- *
- * [필터링 대상]
- * - 도박/카지노 광고
- * - 불법 서비스 홍보
- * - 의심스러운 연락처 패턴 (QQ, Telegram 등)
- *
- * [적용 위치]
- * - Producer: 스팸 뉴스는 Kafka로 전송하지 않음
- * - Consumer: 추가 필터링 (이중 방어)
- */
 public class SpamFilter {
 
     private SpamFilter() {
@@ -56,13 +44,6 @@ public class SpamFilter {
             Pattern.compile("上下分|상하분")
     );
 
-    /**
-     * 스팸 여부 판단
-     *
-     * @param title 제목
-     * @param description 설명
-     * @return true면 스팸
-     */
     public static boolean isSpam(String title, String description) {
         String combined = ((title != null ? title : "") + " " +
                           (description != null ? description : "")).toLowerCase();

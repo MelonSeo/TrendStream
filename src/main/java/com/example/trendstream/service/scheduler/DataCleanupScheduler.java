@@ -10,17 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-/**
- * 데이터 정리 스케줄러
- *
- * [동작 방식]
- * - 매일 새벽 3시에 실행
- * - 보관 기간이 지난 뉴스 데이터 삭제
- * - cascade 설정으로 연관된 NewsTag도 함께 삭제
- *
- * [설정]
- * - data.retention.days: 보관 기간 (기본 60일)
- */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -62,12 +52,6 @@ public class DataCleanupScheduler {
                 deletedCount, cutoffDate.toLocalDate());
     }
 
-    /**
-     * 수동 정리 메서드 (테스트/관리자용)
-     *
-     * @param days 며칠 이전 데이터를 삭제할지
-     * @return 삭제된 건수
-     */
     @Transactional
     public long manualCleanup(int days) {
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(days);

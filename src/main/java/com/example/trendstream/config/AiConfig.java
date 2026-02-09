@@ -10,14 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * AI 분석 서비스 설정
- *
- * ai.provider 값에 따라 사용할 AI 서비스를 결정한다.
- * - groq: Groq 클라우드 LLM (무료 티어 넉넉, 빠름)
- * - gemini: Google Gemini API (무료 티어 한도 있음)
- * - ollama: 로컬 LLM (GPU 필요)
- */
 @Slf4j
 @Configuration
 public class AiConfig {

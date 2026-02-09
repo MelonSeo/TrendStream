@@ -17,17 +17,6 @@ import org.springframework.web.client.RestTemplate;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Gemini AI 분석 서비스
- *
- * [주요 기능]
- * - 단건 분석: analyzeNews() - 뉴스 1개 분석 (레거시, 하위 호환용)
- * - 배치 분석: analyzeBatchNews() - 뉴스 여러 개를 한 번에 분석 (API 호출 절약)
- *
- * [배치 처리 도입 이유]
- * - Gemini 무료 티어 한도 절약 (5개 → 1회 호출)
- * - API 호출 80% 감소
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -42,20 +31,6 @@ public class GeminiService implements AiAnalyzer {
     private static final String API_URL_TEMPLATE =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%s";
 
-    /**
-     * 뉴스 배치 분석 (여러 개를 한 번에 분석)
-     *
-     * [동작 방식]
-     * 1. 뉴스 목록을 프롬프트에 번호와 함께 포함
-     * 2. Gemini에게 JSON 배열로 응답 요청
-     * 3. 응답을 파싱하여 각 뉴스에 매핑
-     *
-     * [API 호출 절약]
-     * - 5개 뉴스 → 1회 API 호출 (기존 대비 80% 절약)
-     *
-     * @param newsList 분석할 뉴스 목록 (최대 5개 권장)
-     * @return 분석 결과 목록 (입력 순서와 동일)
-     */
     @Override
     public List<AiResponse> analyzeBatchNews(List<News> newsList) {
         if (newsList == null || newsList.isEmpty()) {
@@ -132,9 +107,6 @@ public class GeminiService implements AiAnalyzer {
 
     /**
      * 단건 뉴스 분석 (레거시 호환용)
-     *
-     * [주의] 가능하면 analyzeBatchNews() 사용 권장
-     * 이 메서드는 하위 호환성을 위해 유지
      */
     public AiResponse analyzeNews(String newsTitle, String newsDescription) {
         try {

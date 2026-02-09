@@ -5,14 +5,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
-/**
- * 키워드 구독 엔티티
- *
- * [동작 방식]
- * 1. 사용자가 키워드(예: "Spring", "Kubernetes")를 구독
- * 2. 새 뉴스가 들어오면 NotificationConsumer가 키워드 매칭
- * 3. 매칭되면 해당 사용자에게 알림
- */
+
 @Entity
 @Table(name = "subscriptions",
         uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "keyword"}),
@@ -46,9 +39,7 @@ public class Subscription {
     @Column(name = "last_notified_at")
     private LocalDateTime lastNotifiedAt;
 
-    /**
-     * 알림 발송 기록
-     */
+
     public void markNotified() {
         this.lastNotifiedAt = LocalDateTime.now();
     }

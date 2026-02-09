@@ -16,24 +16,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Redis 설정
- *
- * [용도]
- * 1. 알림 큐: 발송 대기 알림 저장
- * 2. 중복 방지: 최근 알림 발송 기록 캐싱
- * 3. API 응답 캐싱: 자주 조회되는 데이터 캐싱 (성능 최적화)
- *
- * [@EnableCaching 동작 원리]
- * - @Cacheable 메서드 호출 시 프록시가 캐시 먼저 확인
- * - 캐시 히트: DB 조회 없이 캐시된 값 반환
- * - 캐시 미스: 메서드 실행 후 결과를 캐시에 저장
- *
- * [캐시 전략]
- * - categories: 1시간 TTL (거의 변경 없음)
- * - sources: 1시간 TTL (거의 변경 없음)
- * - trends: 5분 TTL (주기적 갱신 필요)
- */
 @Configuration
 @EnableCaching
 public class RedisConfig {
@@ -55,14 +37,6 @@ public class RedisConfig {
         return template;
     }
 
-    /**
-     * Redis 캐시 매니저 설정
-     *
-     * [TTL(Time To Live) 설정 이유]
-     * - 무한 캐시 방지: 메모리 누수 예방
-     * - 데이터 신선도 유지: 적절한 주기로 갱신
-     * - 캐시별 차등 TTL: 데이터 특성에 맞게 설정
-     */
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
         // 기본 캐시 설정 (30분 TTL)

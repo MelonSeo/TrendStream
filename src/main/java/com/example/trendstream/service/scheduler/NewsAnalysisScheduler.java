@@ -19,18 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * 뉴스 AI 분석 스케줄러 (배치 처리)
- *
- * [동작 방식]
- * 1. 미분석 뉴스 조회 (aiResult = null) → 배치 분석
- * 2. 분석 실패 뉴스 조회 (summary = '분석 실패') → 재분석
- *
- * [실행 주기]
- * - ai.analysis.interval 프로퍼티로 설정 (기본 10초)
- * - Ollama(로컬): Rate Limit 없으므로 짧게 설정 가능
- * - Gemini(외부): 30초 이상 권장 (분당 15회 제한)
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -93,15 +81,6 @@ public class NewsAnalysisScheduler {
         log.info(">>>> [Scheduler] 배치 분석 완료: {}개 처리됨", targetNews.size());
     }
 
-    /**
-     * AI 분석 키워드를 Tag/NewsTag 테이블에 저장
-     *
-     * [처리 흐름]
-     * 1. AiResponse의 keywords 리스트를 순회
-     * 2. 소문자 정규화 ("Spring" → "spring") → 중복 방지
-     * 3. Tag find-or-create 패턴으로 태그 조회/생성
-     * 4. NewsTag 연관관계 생성
-     */
     private void saveKeywordsAsTags(News news, AiResponse aiResult) {
         if (aiResult.getKeywords() == null || aiResult.getKeywords().isEmpty()) {
             return;

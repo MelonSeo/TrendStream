@@ -23,18 +23,6 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Velog RSS 뉴스 Producer
- *
- * [특징]
- * - 한국 최대 개발자 블로그 플랫폼
- * - 매일 수십~수백 개의 기술 블로그 글 게시
- * - 한국어 개발 콘텐츠의 핵심 소스
- *
- * [수집 주기]
- * - 10분마다 최신 글 수집
- * - 메모리 캐시로 중복 방지
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

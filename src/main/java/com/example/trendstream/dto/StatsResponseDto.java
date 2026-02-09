@@ -10,9 +10,7 @@ import java.util.List;
 
 public class StatsResponseDto {
 
-    /**
-     * 소스별 통계
-     */
+
     @Getter
     @Builder
     @NoArgsConstructor
@@ -22,9 +20,6 @@ public class StatsResponseDto {
         private Long count;
     }
 
-    /**
-     * 시간별 통계
-     */
     @Getter
     @Builder
     @NoArgsConstructor
@@ -34,9 +29,7 @@ public class StatsResponseDto {
         private Long count;
     }
 
-    /**
-     * 일별 통계
-     */
+
     @Getter
     @Builder
     @NoArgsConstructor
@@ -46,9 +39,7 @@ public class StatsResponseDto {
         private Long count;
     }
 
-    /**
-     * 대시보드용 종합 통계
-     */
+
     @Getter
     @Builder
     @NoArgsConstructor

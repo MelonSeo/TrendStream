@@ -1,13 +1,5 @@
 package com.example.trendstream.util;
 
-/**
- * HTML 정제 유틸리티
- *
- * [처리 항목]
- * 1. HTML 태그 제거: <p>, <b>, <a href="..."> 등
- * 2. HTML 엔티티 디코딩: &amp; → &, &quot; → ", &#38; → & 등
- * 3. 공백 정규화: 연속 공백, 줄바꿈 → 단일 공백
- */
 public class HtmlUtils {
 
     private HtmlUtils() {
@@ -34,13 +26,6 @@ public class HtmlUtils {
         return text.replaceAll("<[^>]*>", "");
     }
 
-    /**
-     * HTML 엔티티 디코딩
-     *
-     * [지원 엔티티]
-     * - Named: &amp; &lt; &gt; &quot; &apos; &nbsp;
-     * - Numeric: &#38; &#60; &#x26; 등
-     */
     public static String decodeEntities(String text) {
         if (text == null) return "";
 

@@ -18,18 +18,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * 알림 발송 서비스
- *
- * [구현 기능]
- * - Gmail SMTP를 통한 이메일 발송
- * - Redis 중복 방지 (같은 뉴스+사용자 1시간 내 재발송 안함)
- * - 비동기 발송 (@Async)
- *
- * [확장 가능]
- * - 웹 푸시 (FCM)
- * - Slack/Discord 웹훅
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

@@ -11,10 +11,6 @@ import java.util.Optional;
 
 public interface SubscriptionRepository extends JpaRepository<Subscription, Long> {
 
-    /**
-     * 특정 키워드를 구독 중인 사용자 조회
-     * (알림 활성화된 사용자만)
-     */
     @Query("""
             SELECT s FROM Subscription s
             JOIN FETCH s.user u

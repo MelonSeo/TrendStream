@@ -277,8 +277,6 @@ src/main/java/com/example/trendstream/
 | 문서 | 설명 |
 |-----|------|
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | AWS EC2 배포 가이드 |
-| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | 트러블슈팅 & 개발 기록 |
-| [CLAUDE.md](./CLAUDE.md) | 프로젝트 컨텍스트 (AI 어시스턴트용) |
 
 ## 라이선스
 
