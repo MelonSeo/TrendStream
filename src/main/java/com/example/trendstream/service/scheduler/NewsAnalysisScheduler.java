@@ -32,7 +32,7 @@ public class NewsAnalysisScheduler {
     private final NewsTagRepository newsTagRepository;
 
     /** 배치 크기: 한 번에 분석할 뉴스 개수 */
-    private static final int BATCH_SIZE = 3;
+    private static final int BATCH_SIZE = 5;
 
     /** AI가 이 키워드를 태그로 뽑으면 광고성 콘텐츠로 판단하여 삭제 */
     private static final Set<String> AD_TAG_KEYWORDS = Set.of(
