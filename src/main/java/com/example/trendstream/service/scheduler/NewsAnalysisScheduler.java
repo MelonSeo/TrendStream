@@ -16,8 +16,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -31,6 +33,11 @@ public class NewsAnalysisScheduler {
 
     /** 배치 크기: 한 번에 분석할 뉴스 개수 */
     private static final int BATCH_SIZE = 3;
+
+    /** AI가 이 키워드를 태그로 뽑으면 광고성 콘텐츠로 판단하여 삭제 */
+    private static final Set<String> AD_TAG_KEYWORDS = Set.of(
+            "계정", "구매", "계정구매", "팔로워", "구독자 구매", "좋아요 구매", "비즈니스"
+    );
 
     /**
      * AI 분석 배치 작업 (설정 간격마다 실행)
@@ -63,9 +70,20 @@ public class NewsAnalysisScheduler {
         List<AiResponse> results = aiAnalyzer.analyzeBatchNews(targetNews);
 
         // 4. 결과 매핑 및 업데이트
+        List<News> toDelete = new ArrayList<>();
         for (int i = 0; i < targetNews.size() && i < results.size(); i++) {
             News news = targetNews.get(i);
             AiResponse aiResult = results.get(i);
+
+            // 광고성 태그 감지 시 삭제 대상으로 분류
+            if (hasAdTags(aiResult)) {
+                log.info(">>>> [광고 감지] 삭제 예정 - ID: {}, 제목: {}, 태그: {}",
+                        news.getId(),
+                        news.getTitle().substring(0, Math.min(20, news.getTitle().length())) + "...",
+                        aiResult.getKeywords());
+                toDelete.add(news);
+                continue;
+            }
 
             news.updateAiResult(aiResult);
             saveKeywordsAsTags(news, aiResult);
@@ -75,10 +93,24 @@ public class NewsAnalysisScheduler {
                     aiResult.getScore());
         }
 
-        // 5. 변경사항 저장
+        // 5. 광고성 콘텐츠 삭제
+        if (!toDelete.isEmpty()) {
+            newsRepository.deleteAll(toDelete);
+            log.info(">>>> [광고 삭제] {}건 삭제 완료", toDelete.size());
+        }
+
+        // 6. 변경사항 저장
+        targetNews.removeAll(toDelete);
         newsRepository.saveAll(targetNews);
 
         log.info(">>>> [Scheduler] 배치 분석 완료: {}개 처리됨", targetNews.size());
+    }
+
+    private boolean hasAdTags(AiResponse aiResult) {
+        if (aiResult.getKeywords() == null) return false;
+        return aiResult.getKeywords().stream()
+                .map(k -> k.strip().toLowerCase(Locale.ROOT))
+                .anyMatch(AD_TAG_KEYWORDS::contains);
     }
 
     private void saveKeywordsAsTags(News news, AiResponse aiResult) {

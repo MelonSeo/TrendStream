@@ -4,6 +4,7 @@ import com.example.trendstream.domain.entity.News;
 import com.example.trendstream.domain.enums.NewsType;
 import com.example.trendstream.repository.NewsRepository;
 import com.example.trendstream.dto.NewsMessage;
+import com.example.trendstream.util.SpamFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -30,7 +31,15 @@ public class NewsConsumer {
     public void consumeNews(NewsMessage message) {
         log.info(">>>> [Consumer] 뉴스 수신: {}", message.getTitle());
 
-        // 1. 이미 DB에 있는 뉴스인지 확인 (중복 방지)
+        // 1. 스팸 필터링 (소스 무관 2차 방어선)
+        if (SpamFilter.isSpam(message.getTitle(), message.getDescription())) {
+            log.info(">>>> [Spam] 스팸 필터링: {} - 이유: {}",
+                    message.getTitle(),
+                    SpamFilter.getSpamReason(message.getTitle(), message.getDescription()));
+            return;
+        }
+
+        // 2. 이미 DB에 있는 뉴스인지 확인 (중복 방지)
         if (newsRepository.existsByLink(message.getLink())) {
             log.info(">>>> [Skip] 이미 존재하는 뉴스입니다.");
             return;

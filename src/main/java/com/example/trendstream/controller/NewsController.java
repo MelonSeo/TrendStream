@@ -106,10 +106,10 @@ public class NewsController {
     }
 
 
-    @Operation(summary = "소스별 뉴스 조회", description = "뉴스 출처(Naver, Hacker News, GeekNews)별로 뉴스를 조회합니다.")
+    @Operation(summary = "소스별 뉴스 조회", description = "뉴스 출처(Naver, GeekNews 등)별로 뉴스를 조회합니다.")
     @GetMapping("/source")
     public ResponseEntity<Page<NewsResponseDto>> getNewsBySource(
-            @Parameter(description = "소스명", required = true, example = "Hacker News")
+            @Parameter(description = "소스명", required = true, example = "GeekNews")
             @RequestParam String name,
             @Parameter(hidden = true)
             @PageableDefault(size = 10) Pageable pageable) {

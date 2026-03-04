@@ -430,6 +430,10 @@ docker compose down
 
 # 전체 삭제 (볼륨 포함 - 주의!)
 docker compose down -v
+
+MySQL 접속:                                                                                                                                                                      
+cd ~/trendstream                                                                                                                                                                 
+docker compose exec db mysql -uroot -p trend_stream
 ```
 
 ### 리소스 확인
@@ -506,7 +510,66 @@ docker compose pull app && docker compose up -d app
 
 ---
 
-## 9. 백업 (선택)
+## 9. DB 데이터 관리
+
+### SQL 파일을 컨테이너에서 실행하는 방법
+> SSH 터미널에서 한글 입력이 안 되므로 로컬에서 SQL 파일을 작성 후 EC2로 전송하여 실행
+
+```bash
+# 로컬에서 EC2로 파일 전송
+scp -i ~/.ssh/your-key.pem cleanup.sql ubuntu@<EC2_IP>:~/trendstream/
+
+# EC2에서 컨테이너로 복사 후 실행
+docker compose cp cleanup.sql db:/tmp/cleanup.sql
+docker compose exec db mysql -uroot -pYOUR_DB_PASSWORD --default-character-set=utf8mb4 trend_stream -e "source /tmp/cleanup.sql"
+```
+
+> `~/.ssh/`에 키 파일을 두어야 macOS 권한 문제를 피할 수 있음
+
+### 스팸 데이터 정리 (한자/베트남어)
+
+```sql
+-- 한자 스팸 삭제 (중국어 광고글)
+DELETE nt FROM news_tags nt
+INNER JOIN news n ON nt.news_id = n.id
+WHERE n.title REGEXP '[\\x{4E00}-\\x{9FFF}]'
+   OR n.description REGEXP '[\\x{4E00}-\\x{9FFF}]';
+
+DELETE FROM news
+WHERE title REGEXP '[\\x{4E00}-\\x{9FFF}]'
+   OR description REGEXP '[\\x{4E00}-\\x{9FFF}]';
+
+-- 베트남어 스팸 삭제
+DELETE nt FROM news_tags nt
+INNER JOIN news n ON nt.news_id = n.id
+WHERE n.title REGEXP '[\\x{1E00}-\\x{1EFF}]';
+
+DELETE FROM news
+WHERE title REGEXP '[\\x{1E00}-\\x{1EFF}]';
+```
+
+### 특정 소스 데이터 삭제
+
+```sql
+-- news_tags 먼저 삭제 후 news 삭제 (FK 제약 때문)
+DELETE nt FROM news_tags nt
+INNER JOIN news n ON nt.news_id = n.id
+WHERE n.source = 'SOURCE_NAME';
+
+DELETE FROM news WHERE source = 'SOURCE_NAME';
+DELETE FROM news_stats WHERE source = 'SOURCE_NAME';
+```
+
+### Velog 재분석 초기화
+
+```sql
+-- aiResult를 NULL로 초기화하면 스케줄러가 자동으로 재분석
+UPDATE news SET ai_result = NULL WHERE source = 'Velog';
+```
+
+---
+
+## 10. 백업 (선택)
 
 ### MySQL 데이터 백업
 
